@@ -20,12 +20,12 @@ function get_quads(model)
     vars = unique(model)
     try
         try
-            us = [u1, u2, u3]
+            global us = [u1, u2, u3]
         catch
-            us = [u1, u2]
+            global us = [u1, u2]
         end
     catch
-        us = [u1]
+        global us = [u1]
     end
     doublets = collect(powerset(vars, 2,2))
     diffs = [length(setdiff(doublets[i], us)) for i in 1:length(doublets)]
@@ -84,10 +84,7 @@ function f!(Q, x)
 
 end
 
-
-Symbolics.solve_for([u1+d1 ~ 2, -2u1+3d1+3*e1-u2 ~ 0], [e1, u2])
-
-quads = [-2u1 + 2u2, d1-l1-u1+u2, -d1+l1-u1+u2, d1-u1+ 2u2, l1-u1+ 2u2, 2d1-2*l1, 2d1-l1+u2, u2+2*l1-d1, 2d1+ 2u2, d1+l1+ 2u2, 2u2+2*l1, 2d1-l1+u1, u1-d1+ 2*l1, 2d1+u1+u2, d1+l1+u1+u2, u1+2*l1+u2, d1+ 2u1 - u2, l1+ 2u1-u2, d1+l1+2u1, 2u1+2*l1]
+#quads = [-2u1 + 2u2, d1-l1-u1+u2, -d1+l1-u1+u2, d1-u1+ 2u2, l1-u1+ 2u2, 2d1-2*l1, 2d1-l1+u2, u2+2*l1-d1, 2d1+ 2u2, d1+l1+ 2u2, 2u2+2*l1, 2d1-l1+u1, u1-d1+ 2*l1, 2d1+u1+u2, d1+l1+u1+u2, u1+2*l1+u2, d1+ 2u1 - u2, l1+ 2u1-u2, d1+l1+2u1, 2u1+2*l1]
 
 #@time begin
 
@@ -101,8 +98,8 @@ function checks(nH::Int64, model::Vector{Num})
     lm == nH ? nothing : throw(AssertionError("model does not specify nH different hidings, but instead $lm"))
 end
 
-nH = 5
-model = [u1, u2, u1, d1, d2, d1, l1, l1, l1]
+nH = 4
+model = [u1, u2, u1, d1, d1, d1, l1, l1, l1]
 checks(nH, model) #Stop user right there if definition is nonsense.
 quads = get_quads(model)
 
