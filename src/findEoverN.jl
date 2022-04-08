@@ -21,11 +21,13 @@ include("./helpers.jl")
 
 
 
-model = [u1, u2, u1, d1, d2, d1, l1, l2, l1]
+model = [u1, u2, u1, d1, d2, d1, l1, l1, l1]
 nH = length(unique(model))
 quads = get_quads(model)
 
 notu1d1 = isequal.(unique(model),u1) .+ isequal.(unique(model),d1) .== false
+
+isequal.(unique(model)[notu1d1], u2)
 
 # Quads exactly like in mathematica for specific n=5 model
 
@@ -52,7 +54,7 @@ length(errors)
 
 AnomalyRatio = Array{Num}(undef,size(sol)[2]);
 @time Threads.@threads for i in range(1,size(sol)[2])
-    try 
+    try
         mnew = deepcopy(model)
         for j in 1:length(unique(model))-2
             mnew[isequal.(model,unique(model)[notu1d1][j])] .= sol[j,i]
@@ -84,7 +86,70 @@ data = Dict(
 
 @time FileIO.save("../data/test.jld2", data)
 #print("Histogram time!")
-#@time histogram(AnomalyRatio)
+@time histogram(AnomalyRatio, bins=-10:0.1:10)
+
+"""
+    Do the whole thing numerically
+"""
+
+using CUDA
+using BenchmarkTools
+using StatsBase
+
+
+quadmat = zeros((length(unique(model)),length(quads)))
+for j in 1:length(quads)
+    vars = []
+    for i in 1:length(unique(model))
+        t = substitute(quads[j], Dict(unique(model)[i] => 1))
+        t = substitute(t, Dict([var => 0 for var in unique(model)]))
+        append!(vars, Symbolics.value(t))
+    end
+    quadmat[:,j] = vars
+end
+
+quadvecvec = [(quadmat[:,j][notu1d1], -sum(quadmat[:,j]) + sum(quadmat[:,j][notu1d1])) for j in 1:size(quadmat)[2]]
+
+sol = [0,0,0]
+k = 0
+rawLES = collect(powerset(quadvecvec, nH-2, nH-2))
+@time for i in 1:size(rawLES)[1]
+    A = CuArray(mapreduce(permutedims, vcat, [rawLES[i][j][1] for j in 1:size(rawLES[1])[1]]))
+    b = CuArray([rawLES[i][j][2] for j in 1:size(rawLES[1])[1]])
+    try
+        sol = hcat(sol, A\b)
+        k += 1
+    catch
+        nothing
+    end
+end
+sol = sol[:,2:end]
+
+
+k = 0
+sol = [0,0,0]
+rawLES = collect(powerset(quadvecvec, nH-2, nH-2))
+@time for i in 1:size(rawLES)[1]
+    A = mapreduce(permutedims, vcat, [rawLES[i][j][1] for j in 1:size(rawLES[1])[1]])
+    b = [rawLES[i][j][2] for j in 1:size(rawLES[1])[1]]
+    try
+        sol = hcat(sol, A\b)
+        k += 1
+    catch
+        nothing
+    end
+end
+sol = sol[:,2:end]
+
+EoN = 2/3 .+ 2 .* (2 .+sol[1,:] .+ 3 .* sol[3,:]) ./ (2 .+ sol[1,:] .+ 2 .+sol[2,:])
+
+
+h = fit(Histogram, EoN, -100.0000001:0.1:100)
+h2 = fit(Histogram, AnomalyRatio, -100.0000001:0.1:100)
+
+dif = h2.weights .- h.weights
+
+histogram(sol, bins=-10:1:10)
 
 
 #FileIO.load("./data/test.jld2", "AR")

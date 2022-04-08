@@ -38,7 +38,7 @@ function get_quads(model)
     uniquads .*= fillones
     quads = uniquads[isequal.(uniquads, d1+u1) .!= 1//1] # effectively is not equal...
     quads .*= (length.(string.(quads)) .<= 7) .+ 1//1 # weird way of multiplying all quads by 2 if they only contain two different higgs. This is so sum(abs(higgs)) == 4
-    quads .*= 2//1 # now all quads are multiplied by two. This ensures type stability and does not affect the endresult!
+    #quads .*= 2//1 # now all quads are multiplied by two. This ensures type stability and does not affect the endresult!
 end
 
 """
@@ -69,3 +69,87 @@ function multiplicities(AnomalyRatio)
     end
     return multi
 end
+
+function _model2string(model)
+    un = unique(model)
+    nH = length(un)
+
+    str = "n"*string(nH)
+    for arg in model
+        str *= "_"*string(arg) 
+    end
+    return str
+end
+
+function _save_subsets(model, subsets, xsubset)
+    svdict = Dict()
+    fname = _model2string(model)
+    svdict["subsets"] = subsets
+    svdict["xsubset"] = xsubset
+    @info "Saving..."
+    FileIO.save("./data/"*fname*".jld2", svdict)
+    @info "Done!"
+end
+
+"""
+    Save Anomaly Ratios E/N. Two modes: :hist saves E/N as histogram data (2e5 datapoints, saves time and space for huge datasets), :all (store every single datapoint separately, may be prohibitive above 1e8?)
+"""
+function save_AR(model, ARcm, i::Int)
+    AR = countmap(vcat(ARcm...))
+    fname = _model2string(model)
+
+    @info "Saving..."
+
+    if isfile("./data/"*fname*".jld2") && i != 1 # i.e. overwrite if file exists before calculation
+        cm_old = FileIO.load("./data/"*fname*".jld2", "ARs")
+        cm_new = merge(+,cm_old,AR)
+    else
+        cm_new = AR
+    end
+    FileIO.save("./data/"*fname*".jld2", Dict("ARs" => cm_new))
+
+    @info "Done!"
+end
+
+function get_EoNfunc(model)
+    un = unique(model)
+    nH = length(un)
+    notu1d1 = isequal.(un,u1) .+ isequal.(un,d1) .== false
+    EoN = EoverN(model[1:3], model[4:6], model[7:9])
+    EoN = substitute(EoN, Dict(u1=>1,d1=>1))
+    myEoNtmp = build_function(EoN, un[notu1d1]...)
+    myEoN = eval(myEoNtmp)
+end
+
+function checks(tot, nsamps)
+    if typeof(nsamps) == Int
+        if nsamps > tot
+            @warn "You tried to choose nsamps = $nsamps > total number of subsets = $tot ! I will calculate all models instead and not draw samples."
+            nsamps = nothing
+        elseif 1e-3 * tot < nsamps < tot
+            error("This code does not have an implementation to make sure you don't choose samples twice! nsamps = $nsamps is dangerously close to the total number of subsets ($tot)!")
+        end
+    elseif typeof(nsamps) == Nothing
+        tot > 1e7 && @warn "You are trying to calculate $tot subsets. This will take more than $(tot/1e6) Mbyte of RAM and may take a while. If you think this is a bad idea, please abort!"
+    end
+    return nsamps
+end
+
+
+function read_AR(file)
+    return FileIO.load("./data/"*file*".jld2", "ARs")
+end
+
+_vecvec(mat) = [mat[i,:] for i in 1:size(mat,1)]
+_vecvecvec(mat) = [[mat[j,:,i] for i in 1:size(mat,3)] for j in 1:size(mat,1)]
+
+#=
+a = Dict(collect(1:10000) .=> rand(10000))
+b = Dict(collect(5001:15000) .=> rand(10000))
+countmap(rand(10000,2))
+@benchmark countmap(_vecvec(rand(10000,2)))
+using BenchmarkTools
+c = merge(+,a,b)
+@benchmark merge(+,a,b)
+@benchmark FileIO.save("./data/test.jld2", Dict("ARs" => c))
+=#
