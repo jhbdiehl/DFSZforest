@@ -23,7 +23,6 @@ function get_quads(model)
     allquads = permutedims(hcat(allquads...))
     allquads_conj = deepcopy(allquads)
     allquads_conj[:,1] .*= -1//1
-    allquads_conj
     allquads = vcat(allquads, allquads_conj)
     allquads = [sum(sum(allquads[i,:])) for i in 1:size(allquads)[1]]
     ut = tril(permutedims(hcat([isequal.(allquads, -allquads[i]) for i in 1:length(allquads)]...)),-1) # make sure to remove duplicates like a = -b
@@ -31,7 +30,10 @@ function get_quads(model)
     for i in 1:length(fut)
         allquads[fut[i][1]] = allquads[fut[i][2]]
     end
-    uniquads = unique(allquads) # remove all duplicates
+    #println(length(allquads))
+    #uniquads = unique(allquads, dims=1) # remove all duplicates
+    #println(length(uniquads))
+    uniquads = allquads
     fillones = substitute(uniquads, Dict([var => 1//1 for var in vars]))
     fillones = (sign.(fillones) .== 0) + sign.(fillones) # make sign return 1 if element = 0
     fillones = (fillones .== 1) .* 2//1 .- 1//1 # weird hack to make sure the array contains only Ints, because unique() does not work with negative floats and symbols
@@ -39,6 +41,9 @@ function get_quads(model)
     quads = uniquads[isequal.(uniquads, d1+u1) .!= 1//1] # effectively is not equal...
     quads .*= (length.(string.(quads)) .<= 7) .+ 1//1 # weird way of multiplying all quads by 2 if they only contain two different higgs. This is so sum(abs(higgs)) == 4
     #quads .*= 2//1 # now all quads are multiplied by two. This ensures type stability and does not affect the endresult!
+    #return quads, [1 for i in 1:length(quads)]
+    quads = countmap(quads)
+    return collect(keys(quads)), [1 for i in 1:length(keys(quads))]#collect(values(quads))
 end
 
 """
@@ -135,7 +140,7 @@ function checks(tot, nsamps, un)
 
     m = ifelse(isnothing(nsamps), tot, nsamps)
 
-    @info "You are calculating $m models for a n=$un Higgs model"
+    @info "You are calculating $m models for the $un Higgs model"
     return nsamps
 end
 
@@ -167,13 +172,14 @@ function get_numquads(quads, un, nH)
     return _vecvec(SMatrix{length(quads), nH-2, Int8, (nH-2)*length(quads)}(numquads)), bs
 end
 
-function mysolve(as, bs, idxs)
+function mysolve(as, bs, multis, idxs)
     A = copy(hcat(as[idxs]...)')
     b = bs[idxs]
+    multi = prod(multis[idxs])
 	if _issolvable(A)
-	    return A \ b
+	    return (A \ b, multi)
     else
-		return SVector{length(b),Float64}(NaN for i in 1:length(b))
+		return (SVector{length(b),Float64}(NaN for i in 1:length(b)), multi)
 	end
 end
 
@@ -183,9 +189,11 @@ function _issolvable(mat)
 end
 
 function calculate_EoverN(myEoN, sol, sol_array)
-    AnomalyRatio = myEoN(sol...)
+    AnomalyRatio = myEoN(sol[1]...)
     if AnomalyRatio < 1e3 && AnomalyRatio > -1e3
-        push!(sol_array[Threads.threadid()],AnomalyRatio)
+        for i in 1:sol[2]
+            push!(sol_array[Threads.threadid()],AnomalyRatio)
+        end
     end
 end
 

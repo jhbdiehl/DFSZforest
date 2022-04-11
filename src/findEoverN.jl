@@ -75,6 +75,7 @@ subsets = subsets[isfinite.(AnomalyRatio)]
 AnomalyRatio = AnomalyRatio[isfinite.(AnomalyRatio)]
 checks(AnomalyRatio)
 
+AnomalyRatio[AnomalyRatio .== 8//3]
 
 data = Dict(
     "AR" => AnomalyRatio,
