@@ -121,7 +121,7 @@ function get_EoNfunc(model)
     myEoN = eval(myEoNtmp)
 end
 
-function checks(tot, nsamps)
+function checks(tot, nsamps, un)
     if typeof(nsamps) == Int
         if nsamps > tot
             @warn "You tried to choose nsamps = $nsamps > total number of subsets = $tot ! I will calculate all models instead and not draw samples."
@@ -132,6 +132,10 @@ function checks(tot, nsamps)
     elseif typeof(nsamps) == Nothing
         tot > 1e7 && @warn "You are trying to calculate $tot subsets. This will take more than $(tot/1e6) Mbyte of RAM and may take a while. If you think this is a bad idea, please abort!"
     end
+
+    m = ifelse(isnothing(nsamps), tot, nsamps)
+
+    @info "You are calculating $m models for a n=$un Higgs model"
     return nsamps
 end
 
@@ -143,13 +147,64 @@ end
 _vecvec(mat) = [mat[i,:] for i in 1:size(mat,1)]
 _vecvecvec(mat) = [[mat[j,:,i] for i in 1:size(mat,3)] for j in 1:size(mat,1)]
 
-#=
-a = Dict(collect(1:10000) .=> rand(10000))
-b = Dict(collect(5001:15000) .=> rand(10000))
-countmap(rand(10000,2))
-@benchmark countmap(_vecvec(rand(10000,2)))
-using BenchmarkTools
-c = merge(+,a,b)
-@benchmark merge(+,a,b)
-@benchmark FileIO.save("./data/test.jld2", Dict("ARs" => c))
-=#
+
+
+
+function get_numquads(quads, un, nH)
+    notu1d1 = isequal.(un,u1) .+ isequal.(un,d1) .== false
+    numquads = zeros(Int8,length(quads), nH-2)
+
+    u1d1dict = Dict{Num, Int8}(un .=> 0)
+    u1d1dict[u1] = 1
+    u1d1dict[d1] = 1
+    bs = Vector{Int8}(-1 .* Symbolics.value.(substitute.(quads, (u1d1dict,))))
+
+    for i in 1:nH-2
+        mydict = Dict(un .=> 0.0)
+        mydict[un[notu1d1][i]] = 1.0
+        numquads[:,i] = Symbolics.value.(substitute.(quads, (mydict,)))
+    end
+    return _vecvec(SMatrix{length(quads), nH-2, Int8, (nH-2)*length(quads)}(numquads)), bs
+end
+
+function mysolve(as, bs, idxs)
+    A = copy(hcat(as[idxs]...)')
+    b = bs[idxs]
+	if _issolvable(A)
+	    return A \ b
+    else
+		return SVector{length(b),Float64}(NaN for i in 1:length(b))
+	end
+end
+
+function _issolvable(mat)
+    #rank(mat) == size(mat)[1]
+    ≈(det(mat), 0.0; atol=1e-10) == false # tolerance chosen arbitrarily. Make sure this fits estimated numerical errors!
+end
+
+function calculate_EoverN(myEoN, sol, sol_array)
+    AnomalyRatio = myEoN(sol...)
+    if AnomalyRatio < 1e3 && AnomalyRatio > -1e3
+        push!(sol_array[Threads.threadid()],AnomalyRatio)
+    end
+end
+
+function make_sol_array()
+    solution_data = Vector{Vector{Float64}}()
+    for i in 1:Threads.nthreads()
+        push!(solution_data,Float64[])
+    end
+    return solution_data
+end
+
+function _make_hist(cm; bins=-10:0.0001:13)
+    hi = fit(Histogram, collect(keys(cm)), Weights(collect(values(cm))),bins)#, nbins=5000)
+    m = (hi.edges[1] .+ (hi.edges[1][2] - hi.edges[1][1])/2.)[1:end-1]
+    #hi.weights = Vector{Real}(hi.weights ./ sum(hi.weights))
+    return hi, m
+end
+
+function plot_hist!(hist; yaxis=(:log, [0.00000001, :auto]), kwargs...)
+    plot!(hist[2], hist[1].weights ./ sum(hist[1].weights); yaxis=yaxis, kwargs...)
+    #plot!(hist[2], _gauss_prediction(gauss,hist[1].edges[1]); kwargs..., label="")
+end
