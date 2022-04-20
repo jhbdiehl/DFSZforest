@@ -101,9 +101,7 @@ function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<
 
     if isfile("./data/DFSZ_models/"*fname*".jld2") && i != 1 # i.e. overwrite if file exists before calculation
         cm_old = FileIO.load("./data/DFSZ_models/"*fname*".jld2", "ARs")
-        if cm_old.edges == ARh.edges
-            cm_new = Histogram(ARh.edges, cm_old.weights + ARh.weights)
-        end
+        cm_new = merge(cm_old, ARh)
     else
         cm_new = ARh
     end
