@@ -8,6 +8,7 @@ using Symbolics
 using Combinatorics
 using FileIO, JLD2
 
+#test
 include("./drawer.jl")
 include("./helpers.jl")
 
