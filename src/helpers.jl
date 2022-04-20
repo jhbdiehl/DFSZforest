@@ -99,15 +99,15 @@ function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<
 
     @info "Saving..."
 
-    if isfile("./data/"*fname*".jld2") && i != 1 # i.e. overwrite if file exists before calculation
-        cm_old = FileIO.load("./data/"*fname*".jld2", "ARs")
+    if isfile("./data/DFSZ_models/"*fname*".jld2") && i != 1 # i.e. overwrite if file exists before calculation
+        cm_old = FileIO.load("./data/DFSZ_models/"*fname*".jld2", "ARs")
         if cm_old.edges == ARh.edges
             cm_new = Histogram(ARh.edges, cm_old.weights + ARh.weights)
         end
     else
         cm_new = ARh
     end
-    FileIO.save("./data/"*fname*".jld2", Dict("ARs" => cm_new))
+    FileIO.save("./data/DFSZ_models/"*fname*".jld2", Dict("ARs" => cm_new))
 
     @info "Done!"
 end
@@ -142,7 +142,7 @@ end
 
 
 function read_AR(file)
-    return FileIO.load("./data/"*file*".jld2", "ARs")
+    return FileIO.load("./data/DFSZ_models/"*file*".jld2", "ARs")
 end
 
 _vecvec(mat) = [mat[i,:] for i in 1:size(mat,1)]
