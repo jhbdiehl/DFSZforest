@@ -93,34 +93,3 @@ function filleting_subsets(set, model_file)
         end
      end=#
 end
-
-
-string2dataframe(model_str, "-1_3")
-
-
-
-
-
-model = ["u1","d1","e1","u2"]
-model_str = args2string(model)
-model_str
-a = findfirst("d2", model_str)
-print(a)
-
-str = clean_string(str, ["u1","d1","e1","u2"])
-save_string(str, ["u1","d1","e1","u2"], "-1_3", "Sols")
-
-
-
-fullset = h5read("./data/modelzoo/"*model_str*".h5", "-1_3")
-fullset["Subsets"]
-
-
-
-
-
-
-
-
-
-str = raw""
