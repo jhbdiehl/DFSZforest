@@ -203,9 +203,25 @@ function gaγγ(EoverN, fa) #::[log(GeV^-1)]
     return log10(αem() / (2.0 * pi * fa) * abs(EoverN - 1.924))
 end
 
-function get_gag(AR, ma)
-    kgag = gaγγ.(collect(keys(AR)), Ref(fa(ma)))#round.(keys(AR), digits=5)
-    countmap(kgag, collect(values(AR)))
+function gag_histogram(model; ma=40e-6, edges=-16:0.001:-12, mode=:pdf)
+    tt = read_AR(model)
+
+    gags = gaγγ.(collect(tt.edges...) .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]), fa(ma))[1:end-1]
+    gagh = fit(Histogram, gags, FrequencyWeights(tt.weights), edges)
+    if mode ∈ [:pdf, :probability]
+        gagh = normalize(gagh; mode=mode)
+    end
+
+    return gagh
+end
+
+function gag_cdf(gagh)
+    mw = similar(gagh.weights, Float64)
+    s = sum(gagh.weights)
+    @inbounds for i in 1:length(mw)
+        mw[i] =  sum(gagh.weights[i:end])/ s
+    end
+    return mw
 end
 
 function I_static(::Val{N}, ::Type{T}) where {N,T<:Real}
