@@ -7,6 +7,7 @@ using Random: default_rng
 using Symbolics
 using Combinatorics
 using FileIO, JLD2
+using LaTeXStrings
 
 
 include("./drawer.jl")
@@ -97,5 +98,21 @@ m=10
 end
 
 # Read and plot data
-tt = read_AR(model)
-plot(tt, lt = :stepbins, xrange=(-10,13))
+
+gagh = gag_histogram(model; mode=:probability)
+gagcdf = gag_cdf(gagh)
+
+# example plot
+fname=_model2string(model)
+lab = fname[1:11]*"\n    "*fname[12:20]*"\n    "*fname[21:end]
+p1 = plot(gagh, lt=:stepbins, label=lab, title="DFSZ axion model PDF", 
+    xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability",
+    bottom_margin=2Plots.mm, legend=:topright,
+    size=(400,300), lw=2)
+savefig(p1, "plots/test.pdf")
+
+p2 = plot(gagh.edges[1][1:end-1], gagcdf, label=lab, title="DFSZ axion model CDF", 
+    xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability for bigger gaγγ",
+    bottom_margin=2Plots.mm, legend=:topright,
+    size=(400,300), lw=2)
+savefig(p2, "plots/test2.pdf")
