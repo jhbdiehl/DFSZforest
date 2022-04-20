@@ -97,5 +97,5 @@ m=10
 end
 
 # Read and plot data
-tt = FileIO.load("./data/n8_u1_u2_u3_d1_d2_d3_l1_l1_l3.jld2", "ARs")
+tt = read_AR(model)
 plot(tt, lt = :stepbins, xrange=(-10,13))

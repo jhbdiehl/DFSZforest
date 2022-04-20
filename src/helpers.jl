@@ -141,8 +141,9 @@ function checks(tot, nsamps, un)
 end
 
 
-function read_AR(file)
-    return FileIO.load("./data/DFSZ_models/"*file*".jld2", "ARs")
+function read_AR(model)
+    fname = _model2string(model)
+    return FileIO.load("./data/DFSZ_models/"*fname*".jld2", "ARs")
 end
 
 _vecvec(mat) = [mat[i,:] for i in 1:size(mat,1)]
