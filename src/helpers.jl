@@ -86,16 +86,6 @@ function _model2string(model)
     return str
 end
 
-function _save_subsets(model, subsets, xsubset)
-    svdict = Dict()
-    fname = _model2string(model)
-    svdict["subsets"] = subsets
-    svdict["xsubset"] = xsubset
-    @info "Saving..."
-    FileIO.save("./data/"*fname*".jld2", svdict)
-    @info "Done!"
-end
-
 """
     Save Anomaly Ratios E/N. Two modes: :hist saves E/N as histogram data (2e5 datapoints, saves time and space for huge datasets), :all (store every single datapoint separately, may be prohibitive above 1e8?)
 """
@@ -190,24 +180,6 @@ function mysolve(as::AbstractVector{<:SVector{N,T}}, bs, idxs) where {N,T<:Real}
     ifelse(solveable, b_cand, b_nonsolve)
 end
 
-
-function calculate_EoverN(myEoN, sol, sol_array)
-    AnomalyRatio = myEoN(sol[1]...)
-    #N = 0.5 * (2 + sum(sol[1][1:length(uds)]))
-    if AnomalyRatio < 1e3 && AnomalyRatio > -1e3
-        for i in 1:sol[2]
-            push!(sol_array[Threads.threadid()],[AnomalyRatio, N])
-        end
-    end
-end
-
-function make_sol_array()
-    solution_data = Vector{Vector{Vector{Float64}}}()
-    for i in 1:Threads.nthreads()
-        push!(solution_data,Float64[])
-    end
-    return solution_data
-end
 
 function _make_hist(cm; bins=-10:0.0001:13)
     hi = fit(Histogram, collect(keys(cm)), Weights(collect(values(cm))),bins)#, nbins=5000)
