@@ -232,6 +232,28 @@ function gag_cdf(gagh)
     return mw
 end
 
+_makeoptions(a,b,c) = [
+    [a, a, a],
+    [a, a, b],
+    [a, b, a],
+    [a, b, b],
+    [a, b, c]
+]
+
+function generate_all_models()
+    us = _makeoptions(u1,u2,u3)
+    ds = _makeoptions(d1,d2,d3)
+    ls = _makeoptions(l1,l2,l3)
+
+    tmp_models = collect(Iterators.product(us, ds, ls));
+    length(tmp_models)
+    model_list = [u1 for i in 1:9]#similar([1 for i in 1:length(tmp_models)], Any)
+    for tmp in collect(Iterators.product(us, ds, ls))
+        model_list = hcat(model_list, [tmp[1]...,tmp[2]...,tmp[3]...])
+    end
+    _vecvec(model_list[:,2:end]')
+end
+
 function I_static(::Val{N}, ::Type{T}) where {N,T<:Real}
     convert(SMatrix{N,N,T}, Diagonal(SVector(ntuple(i -> one(T), Val(N)))))
 end

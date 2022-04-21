@@ -66,25 +66,49 @@ function parallel_alleqn_solve_proc!(
     end
 end
 
-model = [u1, u2, u3, u1, u2, u3, u1, u2, u3]
-model = [u1, u1, u1, u1, u1, u1, u1, u1, u1]
+#=
+nHs = []
+for model in generate_all_models()
+    append!(nHs, length(unique(model)))
+end
+sum(nHs .== 8)
+string(nHs[1])
+=#
 
-@time begin
+for model in generate_all_models()
     un = unique(model)
     nH = length(un)
+
     quads, multis = get_quads(model)
     tot = binomial(length(quads),nH-2)
+    @info ""
+    @info "Next model group!"
+    @info ""
     @printf "Your model-group has %.3E models \n" tot
     @time as, bs = get_numquads(quads, un, nH)
     myEoN = get_EoNfunc(model)
+    if tot <= 10^9
+        # Save all ARs for a specific model
+        proc_rs = similar(bs, tot)
+        rs_ws = similar(multis, length(proc_rs))
+        @time parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot)
+        @time save_AR(model, proc_rs, rs_ws, 1; folder="n"*string(nH)*"/")
+    else
+        chunk = 10^7
+        m=10
+        @time for i in 1:m
+            @info "Computing round $i of $m"
+            proc_rs = similar(bs, chunk)
+            rs_ws = similar(multis, length(proc_rs))
+            @time parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot)
+            @time save_AR(model, proc_rs, rs_ws, i; folder="n"*string(nH)*"/")
+        end
+    end
 end
 
-i = 0
-for model in collect(with_replacement_combinations([u1,d1, l1],9))
-    nH = length(unique(model))
-    i += ifelse(nH==3,1,0)
-end
-i
+
+# This would be the procedure to actually calculate really all models!
+#=
 for model in with_replacement_combinations([u1, d1, l1],9)
     un = unique(model)
     nH = length(un)
@@ -102,9 +126,10 @@ for model in with_replacement_combinations([u1, d1, l1],9)
         proc_rs = similar(bs, tot)
         rs_ws = similar(multis, length(proc_rs))
         @time parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot)
-        @time save_AR(model, proc_rs, rs_ws, 1; folder="n3/")
+        @time save_AR(model, proc_rs, rs_ws, 1; folder="n"*string(nH)*"/")
     end
 end
+=#
 
 #Save samples
 #=
@@ -120,6 +145,7 @@ end
 =#
 
 # Read and plot data
+#=
 files = readdir("./data/DFSZ_models/n3")
 hist_list = similar(files, Any)
 @time for (i, file) in enumerate(files)
@@ -147,3 +173,4 @@ p2 = plot(gagh.edges[1][1:end-1], gagcdf, label=lab, title="DFSZ axion model CDF
     bottom_margin=2Plots.mm, legend=:topright,
     size=(400,300), lw=2)
 savefig(p2, "plots/test2.pdf")
+=#
