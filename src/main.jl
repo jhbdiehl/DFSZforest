@@ -7,7 +7,7 @@ using Random: default_rng
 using Symbolics
 using Combinatorics
 using FileIO, JLD2
-using LaTeXStrings
+using LaTeXStrings, Printf
 
 
 include("./drawer.jl")
@@ -66,9 +66,9 @@ function parallel_alleqn_solve_proc!(
     end
 end
 
-model = [u1, u2, u3, d1, d2, d3, l1, l1, l3]
+model = [u1, u2, u3, u1, u2, u3, u1, u2, u3]
+model = [u1, u1, u1, u1, u1, u1, u1, u1, u1]
 
-using Printf
 @time begin
     un = unique(model)
     nH = length(un)
@@ -79,14 +79,35 @@ using Printf
     myEoN = get_EoNfunc(model)
 end
 
+i = 0
+for model in collect(with_replacement_combinations([u1,d1, l1],9))
+    nH = length(unique(model))
+    i += ifelse(nH==3,1,0)
+end
+i
+for model in with_replacement_combinations([u1, d1, l1],9)
+    un = unique(model)
+    nH = length(un)
+    if nH < 3
+        nothing
+    else
+        quads, multis = get_quads(model)
+        tot = binomial(length(quads),nH-2)
+        @printf "Your model-group has %.3E models \n" tot
+        @time as, bs = get_numquads(quads, un, nH)
+        myEoN = get_EoNfunc(model)
 
-# Save all ARs for a specific model
-#proc_rs = similar(bs, tot)
-#rs_ws = similar(multis, length(proc_rs))
-#@time parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot)
-#@time save_AR(model, proc_rs, rs_ws, 1)
+
+        # Save all ARs for a specific model
+        proc_rs = similar(bs, tot)
+        rs_ws = similar(multis, length(proc_rs))
+        @time parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot)
+        @time save_AR(model, proc_rs, rs_ws, 1; folder="n3/")
+    end
+end
 
 #Save samples
+#=
 chunk = 10^7
 m=10
 @time for i in 1:m
@@ -96,14 +117,24 @@ m=10
     @time parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot)
     @time save_AR(model, proc_rs, rs_ws, i)
 end
+=#
 
 # Read and plot data
+files = readdir("./data/DFSZ_models/n3")
+hist_list = similar(files, Any)
+@time for (i, file) in enumerate(files)
+    model = fname2model(file)
 
-gagh = gag_histogram(model; mode=:probability)
+    tt = read_AR(model; folder="n3/")
+    gagh = gag_histogram(tt; mode=:probability)
+    hist_list[i] = gagh
+end
+
+gagh = merge(hist_list...)
 gagcdf = gag_cdf(gagh)
-
 # example plot
-fname=_model2string(model)
+model = fname2model(readdir("./data/DFSZ_models/n3")[1])
+fname=model2string(model)
 lab = fname[1:11]*"\n    "*fname[12:20]*"\n    "*fname[21:end]
 p1 = plot(gagh, lt=:stepbins, label=lab, title="DFSZ axion model PDF", 
     xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability",
