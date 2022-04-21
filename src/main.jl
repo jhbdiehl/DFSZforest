@@ -31,7 +31,7 @@ end
 function parallel_randeqn_solve_proc!(
     proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
     as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
-    tot::Int
+    tot::Int, myEoN
 ) where N
 
     idxarr, bnc = make_idx_bnc(N)
@@ -50,7 +50,7 @@ end
 function parallel_alleqn_solve_proc!(
     proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
     as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
-    tot::Int
+    tot::Int, myEoN
 ) where N
 
     idxarr, bnc = make_idx_bnc(N)
@@ -78,21 +78,24 @@ string(nHs[1])
 for model in generate_all_models()
     un = unique(model)
     nH = length(un)
-
+    @time begin
     quads, multis = get_quads(model)
     tot = binomial(length(quads),nH-2)
     @info ""
     @info "Next model group!"
     @info ""
     @printf "Your model-group has %.3E models \n" tot
-    @time as, bs = get_numquads(quads, un, nH)
+    as, bs = get_numquads(quads, un, nH)
     myEoN = get_EoNfunc(model)
+    end
     if tot <= 10^9
         # Save all ARs for a specific model
+        @time begin
         proc_rs = similar(bs, tot)
         rs_ws = similar(multis, length(proc_rs))
-        @time parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot)
-        @time save_AR(model, proc_rs, rs_ws, 1; folder="n"*string(nH)*"/")
+        parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
+        save_AR(model, proc_rs, rs_ws, 1; folder="n"*string(nH)*"/")
+        end
     else
         chunk = 10^7
         m=10
@@ -100,8 +103,8 @@ for model in generate_all_models()
             @info "Computing round $i of $m"
             proc_rs = similar(bs, chunk)
             rs_ws = similar(multis, length(proc_rs))
-            @time parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot)
-            @time save_AR(model, proc_rs, rs_ws, i; folder="n"*string(nH)*"/")
+            parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
+            save_AR(model, proc_rs, rs_ws, i; folder="n"*string(nH)*"/")
         end
     end
 end
