@@ -75,20 +75,20 @@ sum(nHs .== 8)
 string(nHs[1])
 =#
 
-for model in generate_all_models()
+for model in generate_all_models()[111:end]
     un = unique(model)
     nH = length(un)
     @time begin
     quads, multis = get_quads(model)
     tot = binomial(length(quads),nH-2)
     @info ""
-    @info "Next model group!"
+    @info "Next model group: $model"
     @info ""
     @printf "Your model-group has %.3E models \n" tot
     as, bs = get_numquads(quads, un, nH)
     myEoN = get_EoNfunc(model)
     end
-    if tot <= 10^9
+    if tot <= 10^10
         # Save all ARs for a specific model
         @time begin
         proc_rs = similar(bs, tot)
@@ -97,7 +97,7 @@ for model in generate_all_models()
         save_AR(model, proc_rs, rs_ws, 1; folder="n"*string(nH)*"/")
         end
     else
-        chunk = 10^7
+        chunk = 10^8
         m=10
         @time for i in 1:m
             @info "Computing round $i of $m"
@@ -149,18 +149,57 @@ end
 
 # Read and plot data
 #=
-files = readdir("./data/DFSZ_models/n3")
-hist_list = similar(files, Any)
-@time for (i, file) in enumerate(files)
-    model = fname2model(file)
+gaghs = similar(3:9, Any)
+for k in 3:9
+    @info "$k"
+    files = readdir("./data/DFSZ_models/preliminary2/n"*string(k))
+    #hist_list = similar(files, Any)
+    @time for (i, file) in enumerate(files)
+        model = fname2model(file)
 
-    tt = read_AR(model; folder="n3/")
-    gagh = gag_histogram(tt; mode=:probability)
-    hist_list[i] = gagh
+        tt = read_AR(model; folder="/preliminary2/n"*string(k)*"/")
+        tt = normalize(tt; mode=:probability)
+        p1 = plot(tt, lt=:stepbins, label="", title="$(file[1:end-5])", 
+            xlabel="E/N", ylabel="Probability", xrange=(-10,13),
+            bottom_margin=2Plots.mm, legend=:topright,
+            size=(400,300), lw=2)
+        savefig(p1, "plots/preliminary2/ARs/$(file[1:end-5])_ARs.pdf")
+        #gagh = gag_histogram(tt; mode=:probability)
+        #hist_list[i] = gagh
+    end
+    #gaghs[k-2] = merge(hist_list...)
 end
 
-gagh = merge(hist_list...)
-gagcdf = gag_cdf(gagh)
+files = readdir("./data/DFSZ_models/preliminary2/n"*string(8))[1]
+files[1:end-5]
+model = fname2model(files)
+tt = read_AR(model; folder="preliminary2/n"*string(8)*"/")
+plot(tt, lt=:stepbins, xrange=(-10,13))
+gaghs = normalize.(gaghs; mode=:probability)
+gagscdf = gag_cdf.(gaghs)
+
+plot()
+#for gagh in gaghs[1]
+p1 = plot!(gaghs[end], lt=:stepbins, label="", title="DFSZ n=9 axion models PDF", 
+    xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability",
+    bottom_margin=2Plots.mm, legend=:topright,
+    size=(400,300), lw=2)
+#end
+plot!()
+savefig(p1, "plots/preliminary/n9_pdf.pdf")
+
+plot()
+for gagh in gaghs[2:end]
+    p2 = plot!(gagh.edges[1][1:end-1], gag_cdf(gagh), label="", title="DFSZ axion model CDF", 
+        xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability for bigger gaγγ",
+        bottom_margin=2Plots.mm, legend=:topright,
+        size=(400,300), lw=2)
+end
+p3 = plot!()
+savefig(p3, "plots/preliminary/alln_cdf.pdf")
+
+
+
 # example plot
 model = fname2model(readdir("./data/DFSZ_models/n3")[1])
 fname=model2string(model)
