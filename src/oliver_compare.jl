@@ -222,12 +222,12 @@ end
 
 
 
-proc_rs = similar(bs, 10^8);
+proc_rs = similar(bs, 10^9);
 rs_ws = similar(multis, length(proc_rs))
 
 function parallel_randeqn_solve_proc!(
     proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
-    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer}
+    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer}, myEoN
 ) where N
 
     idxarr, bnc = make_idx_bnc(N)
@@ -242,8 +242,8 @@ function parallel_randeqn_solve_proc!(
     end
 end
 
-@time begin parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis)
- save_AR(model, proc_rs, rs_ws, 1) end
+@time parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, myEoN)
+save_AR(model, proc_rs, rs_ws, 1)
 
 fname = _model2string(model)
 tt = FileIO.load("./"*fname*".jld2", "ARs")
