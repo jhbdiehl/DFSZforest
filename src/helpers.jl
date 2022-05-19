@@ -75,7 +75,7 @@ function multiplicities(AnomalyRatio)
     return multi
 end
 
-function _model2string(model)
+function model2string(model)
     un = unique(model)
     nH = length(un)
 
@@ -86,11 +86,21 @@ function _model2string(model)
     return str
 end
 
+function fname2model(model_str)
+    args = split(model_str, "_")
+    args[end] = split(args[end], ".")[1]
+    symargs = similar(args, Num)
+    for var in [u1, u2, u3, d1, d2, d3, l1, l2, l3]
+        symargs[args .== String(Symbol(var))] .= var
+    end
+    return symargs[2:end]
+end
+
 """
     Save Anomaly Ratios E/N. Two modes: :hist saves E/N as histogram data (2e5 datapoints, saves time and space for huge datasets), :all (store every single datapoint separately, may be prohibitive above 1e8?)
 """
-function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int)
-    fname = _model2string(model)
+function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="")
+    fname = model2string(model)
     good_idxs = findall(!isnan, proc_rs)
     good_proc_rs = proc_rs[good_idxs]
     good_rs_ws = rs_ws[good_idxs]
@@ -99,13 +109,13 @@ function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<
 
     @info "Saving..."
 
-    if isfile("./data/DFSZ_models/"*fname*".jld2") && i != 1 # i.e. overwrite if file exists before calculation
-        cm_old = FileIO.load("./data/DFSZ_models/"*fname*".jld2", "ARs")
+    if isfile("./data/DFSZ_models/"*folder*fname*".jld2") && i != 1 # i.e. overwrite if file exists before calculation
+        cm_old = FileIO.load("./data/DFSZ_models/"*folder*fname*".jld2", "ARs")
         cm_new = merge(cm_old, ARh)
     else
         cm_new = ARh
     end
-    FileIO.save("./data/DFSZ_models/"*fname*".jld2", Dict("ARs" => cm_new))
+    FileIO.save("./data/DFSZ_models/"*folder*fname*".jld2", Dict("ARs" => cm_new))
 
     @info "Done!"
 end
@@ -139,9 +149,9 @@ function checks(tot, nsamps, un)
 end
 
 
-function read_AR(model)
-    fname = _model2string(model)
-    return FileIO.load("./data/DFSZ_models/"*fname*".jld2", "ARs")
+function read_AR(model; folder="")
+    fname = model2string(model)
+    return FileIO.load("./data/DFSZ_models/"*folder*fname*".jld2", "ARs")
 end
 
 _vecvec(mat) = [mat[i,:] for i in 1:size(mat,1)]
@@ -220,6 +230,28 @@ function gag_cdf(gagh)
         mw[i] =  sum(gagh.weights[i:end])/ s
     end
     return mw
+end
+
+_makeoptions(a,b,c) = [
+    [a, a, a],
+    [a, a, b],
+    [a, b, a],
+    [a, b, b],
+    [a, b, c]
+]
+
+function generate_all_models()
+    us = _makeoptions(u1,u2,u3)
+    ds = _makeoptions(d1,d2,d3)
+    ls = _makeoptions(l1,l2,l3)
+
+    tmp_models = collect(Iterators.product(us, ds, ls));
+    length(tmp_models)
+    model_list = [u1 for i in 1:9]#similar([1 for i in 1:length(tmp_models)], Any)
+    for tmp in collect(Iterators.product(us, ds, ls))
+        model_list = hcat(model_list, [tmp[1]...,tmp[2]...,tmp[3]...])
+    end
+    _vecvec(model_list[:,2:end]')
 end
 
 function I_static(::Val{N}, ::Type{T}) where {N,T<:Real}
