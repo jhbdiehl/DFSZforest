@@ -31,9 +31,8 @@ function ksvz(str; edges=-10:0.01:50)
 
         KSVZgag = gag_histogram(KSVZ_ARs, mode=:probability, edges=-17.5:0.001:-12)
         KSVZgag = normalize(KSVZgag; mode=:probability)
-        KSVZcdf = gag_cdf(KSVZgag)
 
-        return KSVZ_ARs, KSVZgag, KSVZcdf, n_dw
+        return KSVZ_ARs, KSVZgag, n_dw
     else
         error("Can only read three different histograms from Plakkot: additive, all and same_reps")
     end

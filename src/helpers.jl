@@ -203,9 +203,7 @@ function gaγγ(EoverN, fa) #::[log(GeV^-1)]
     return log10(αem() / (2.0 * pi * fa) * abs(EoverN - 1.924))
 end
 
-function gag_histogram(model; ma=40e-6, edges=-16:0.001:-12, mode=:pdf)
-    tt = read_AR(model)
-
+function gag_histogram(tt; ma=40e-6, edges=-16:0.001:-12, mode=:pdf)
     gags = gaγγ.(collect(tt.edges...) .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]), fa(ma))[1:end-1]
     gagh = fit(Histogram, gags, FrequencyWeights(tt.weights), edges)
     if mode ∈ [:pdf, :probability]
