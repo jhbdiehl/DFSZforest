@@ -29,7 +29,7 @@ function ksvz(str; edges=-10:0.01:50)
         n_dw = convert(Vector{Float64}, n_dw)
         KSVZ_ARs = fit(Histogram, e_n, FrequencyWeights(e_n_counts), edges)
 
-        KSVZgag = gag_histogram(KSVZ_ARs, mode=:probability, edges=-17.5:0.001:-12)
+        KSVZgag = gag_histogram(KSVZ_ARs, mode=:probability, edges=-18:0.001:-12)
         KSVZgag = normalize(KSVZgag; mode=:probability)
 
         return KSVZ_ARs, KSVZgag, n_dw

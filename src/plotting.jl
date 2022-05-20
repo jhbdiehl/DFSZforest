@@ -40,7 +40,7 @@ function get_data(file; folder="/preliminary2/n"*string(4)*"/")
     ARh = normalize(ARh; mode=:probability)
     gagh = gag_histogram(ARh; mode=:probability)
     gagh = normalize(gagh; mode=:probability)
-    return ARh, gagh, gagcdf
+    return ARh, gagh
 end
 
 function init_cdf()
@@ -69,94 +69,27 @@ function plot_pdf!(H; kwargs...)
     return p1
 end
 
+function limit(frac, H)
+    H.edges[1][1:end-1][cdf(H) .> frac][end]
+end
+
 
 # Read KSVZ anomaly ratios from Plakkots data.
 KSVZ_ARs, KSVZgag, n_dw = ksvz("all")
-KSVZcdf = gag_cdf(KSVZgag)
+KSVZcdf = gag_cdf(KSVZ_ARs)
 
 ARhs, gaghs = all_data()
-gagcdfs = gag_cdf.(gaghs)
+@time gagcdfs = gag_cdf.(gaghs)
+@time ARcdfs = cdf.(ARhs)
+
+# make a histogram of just the abs(EoN - 1.92) part to feed to limit plot
+Arr = rescale_histogram(merge(ARhs...))
+limit(0.68, Arr)
 
 init_cdf()
-plot_cdf!(gagcdf, gagh)
+plot_cdf!(Arrc, Arr)
+
+init_cdf()
+plot_cdf!(Arrc, Arr, xlims=(-2,50))
 init_pdf()
 plot_pdf!(ARh; color=:blue, xlims=(-5,10))
-
-
-function limit(frac, cdf, H)
-    H.edges[1][1:end-1][cdf .> frac][end]
-end
-
-limit(0.68, gagcdfs[1], gagh[1])
-
-
-gagtot.edges[1][1:end-1][gagtotcdf .> 0.68][end]
-gagtot.edges[1][1:end-1][gagtotcdf .> 0.95][end]
-
-
-KSVZ_ARs.edges[1][1:end-1][KSVZcdf .> 0.68][end]
-KSVZ_ARs.edges[1][1:end-1][KSVZcdf .> 0.95][end]
-
-
-plot(KSVZ_ARs, title="Axion model CDF KSVZ vs DFSZ comparison", 
-    xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability for bigger gaγγ",
-    bottom_margin=2Plots.mm, legend=:bottomleft,
-    size=(550,400), lw=3, label="KSVZ-like models (all)")
-
-#plot(normalize(KSVZ_ARs; mode=:probability), label="", title="DFSZ axion model CDF", 
-#    xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability for bigger gaγγ",
-#    bottom_margin=2Plots.mm, legend=:topright,
-#    size=(400,300), lw=2)
-
-gaghs = similar(3:9, Any)
-for k in 3:9
-    @info "$k"
-    files = readdir("./data/DFSZ_models/preliminary2/n"*string(k))
-    hist_list = similar(files, Any)
-    @time for (i, file) in enumerate(files)
-        model = fname2model(file)
-
-        tt = read_AR(model; folder="/preliminary2/n"*string(k)*"/")
-        tt = normalize(tt; mode=:probability)
-#        p1 = plot(tt, lt=:stepbins, label="", title="$(file[1:end-5])", 
-#            xlabel="E/N", ylabel="Probability", xrange=(-10,13),
-#            bottom_margin=2Plots.mm, legend=:topright,
-#            size=(400,300), lw=2)
-#        savefig(p1, "plots/preliminary2/ARs/$(file[1:end-5])_ARs.pdf")
-        ttrescale = abs.(collect(tt.edges...) .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]) .- 1.92)[1:end-1]
-        gagh = fit(Histogram, ttrescale, FrequencyWeights(tt.weights), -1:0.01:20)
-        #gagh = gag_histogram(tt; mode=:probability, edges=-17:0.001:-12)
-        hist_list[i] = gagh
-    end
-    gaghs[k-2] = merge(hist_list...)
-end
-
-gagtot = merge(gaghs...)
-
-gagtot = normalize(gagtot; mode=:probability)
-gagtotcdf = gag_cdf(gagtot)
-
-gagtot.edges[1][1:end-1][gagtotcdf .> 0.68][end]
-gagtot.edges[1][1:end-1][gagtotcdf .> 0.95][end]
-
-plot!(gagtot.edges[1][1:end-1], gagtotcdf, lw=3, label="DFSZ-like models")
-savefig("./plots/preliminary2/CDFcompare.pdf")
-
-
-
-
-KSVZgag = gag_histogram(KSVZ_ARs, mode=:probability, edges=-18:0.001:-12)
-KSVZgag = normalize(KSVZgag; mode=:probability)
-
-plot(KSVZgag, lt=:stepbins, label=lab, title="DFSZ axion model PDF", 
-    xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability",
-    bottom_margin=2Plots.mm, legend=:topright,
-    size=(800,600), lw=2)
-
-vline!([2/3, 5/3,8/3])
-
-KSVZcdf = gag_cdf(KSVZgag)
-plot(KSVZgag.edges[1][1:end-1], KSVZcdf, label="", title="DFSZ axion model CDF", 
-    xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability for bigger gaγγ",
-    bottom_margin=2Plots.mm, legend=:topright,
-    size=(400,300), lw=2)

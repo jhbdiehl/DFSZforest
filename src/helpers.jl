@@ -213,6 +213,14 @@ function gaγγ(EoverN, fa) #::[log(GeV^-1)]
     return log10(αem() / (2.0 * pi * fa) * abs(EoverN - 1.924))
 end
 
+function rescale_histogram(tt; edges=-50:0.01:50, mode=:pdf)
+    ARrs = abs.(collect(tt.edges...) .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]) .- 1.924)[1:end-1]
+    ARrh = fit(Histogram, ARrs, FrequencyWeights(tt.weights), edges)
+    if mode ∈ [:pdf, :probability]
+        ARrh = normalize(ARrh; mode=mode)
+    end
+end
+
 function gag_histogram(tt; ma=40e-6, edges=-16:0.001:-12, mode=:pdf)
     gags = gaγγ.(collect(tt.edges...) .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]), fa(ma))[1:end-1]
     gagh = fit(Histogram, gags, FrequencyWeights(tt.weights), edges)
@@ -223,13 +231,9 @@ function gag_histogram(tt; ma=40e-6, edges=-16:0.001:-12, mode=:pdf)
     return gagh
 end
 
-function gag_cdf(gagh)
-    mw = similar(gagh.weights, Float64)
-    s = sum(gagh.weights)
-    @inbounds for i in 1:length(mw)
-        mw[i] =  sum(gagh.weights[i:end])/ s
-    end
-    return mw
+
+function cdf(Hist) # I want mw[i] =  sum(gagh.weights[i:end])/ s aka cumsum from the back
+    return cumsum(Hist.weights[end:-1:1])[end:-1:1] / sum(Hist.weights)
 end
 
 _makeoptions(a,b,c) = [
