@@ -1,8 +1,9 @@
 using StaticArrays
 using Symbolics
-#using LaTeXStrings, Plots
+using LaTeXStrings#, Plots
 using FileIO
 using LinearAlgebra
+using Combinatorics
 
 import PyPlot
 const plt = PyPlot
@@ -15,7 +16,7 @@ include("ksvz.jl")
 #fname=model2string(model)
 #lab = fname[1:11]*"\n    "*fname[12:20]*"\n    "*fname[21:end]
 
-function all_data()
+function all_data(;merge=true)
     gaghs = similar(3:9, Any)
     ARhs = similar(3:9, Any)
     for k in 3:9
@@ -32,8 +33,6 @@ function all_data()
         ARhs[k-2] = merge(hist1_list...)
         gaghs[k-2] = merge(hist2_list...)
     end
-    ARh =  merge(ARhs...)
-    gagh = merge(gaghs...)
     return ARhs, gaghs
 end
 
@@ -41,7 +40,7 @@ function get_data(file; folder="/preliminary2/n"*string(4)*"/")
     model = fname2model(file)
     ARh = read_AR(model; folder=folder*"/")
     #ARh = normalize(ARh; mode=:probability)
-    gagh = gag_histogram(ARh; mode=:probability)
+    gagh = gag_histogram(ARh; mode=:probability, edges=-16.5:0.001:-12)
     gagh = normalize(gagh; mode=:probability)
     return ARh, gagh
 end
@@ -88,6 +87,91 @@ ARhs, gaghs = all_data()
 # make a histogram of just the abs(EoN - 1.92) part to feed to limit plot
 Arr = rescale_histogram(merge(ARhs...))
 limit(0.68, Arr)
+
+
+c1 = "mediumseagreen"
+c2 = "maroon"
+
+c1a = 1.0
+c2a = 0.4
+
+
+#=
+# Plot all n=4 models in one histogram
+myAR = ARhs[2]#normalize(ARhs[2]; mode=:probability)
+fig, ax = plt.subplots(figsize=(6, 4))
+ax.stairs(myAR.weights, myAR.edges[1], ec=c2, lw=2, alpha=c2a)
+plt.xlim([5/3-20,5/3+20])
+plt.yscale("log")
+plt.ylim([1,600])
+plt.xlabel("Anomaly Ratio E/N")
+plt.ylabel("Number of models")
+plt.title(L"All DFSZ-like $n_H = 4$ models")
+plt.axvline(5/3, ls=":", color="grey")
+plt.axvline(2/3, ls=":", color="k")
+plt.axvline(8/3, ls=":", color="k")
+plt.text(4,200, "symmetry axis 5/3", color="grey")
+plt.text(-5,350, "DFSZ-II", color="k")
+plt.text(4,350, "DFSZ-I", color="k")
+plt.savefig("plots/preliminary2/PDFn4tot.pdf")
+#################################################
+=#
+
+#=
+# Plot all n=4 models separately
+k = 4
+@info "$k"
+fold = "preliminary2/n"*string(k)
+files = readdir("./data/DFSZ_models/"*fold)
+hist1_list = similar(files, Any)
+hist2_list = similar(files, Any)
+@time for (i, file) in enumerate(files)
+    ARh, gagh = get_data(file; folder=fold)
+    hist1_list[i] = ARh
+    hist2_list[i] = gagh
+end
+
+slist= ["up", "charm", "top", "down", "strange", "bottom", "electron", "muon", "tau"]
+
+a = collect(with_replacement_combinations(1:3, 2))
+b = collect(permutations(1:3,2))
+ab = sort(unique(vcat(a,b)))
+
+fig, ax = plt.subplots(3,3,figsize=(8, 6), sharex=true, sharey=true)
+i = 1
+for h in hist1_list[end:-1:1]
+    #h = normalize(h; mode=:probability)
+    ax[ab[i][1],ab[i][2]].set_xlim([5/3-20,5/3+20])
+    ax[ab[i][1],ab[i][2]].set_yscale("log")
+    #ax[ab[i][1],ab[i][2]].set_ylim([1e-3,3e-1])
+    ax[3,ab[i][2]].set_xlabel("Anomaly Ratio E/N")
+    ax[ab[i][1],1].set_ylabel("Number of models")
+    ax[ab[i][1],ab[i][2]].stairs(h.weights, h.edges[1], lw=2, ec=c2, alpha=0.4)
+    ax[ab[i][1],ab[i][2]].set_title(L"..."*slist[i])
+    i += 1
+end
+plt.suptitle(L"DFSZ-like $n_H = 4$ models, special coupling to...")
+plt.savefig("plots/preliminary2/PDFn4all.pdf")
+#################################################
+=#
+
+#=
+# comparison plot E/N cdf of DFSZ vs KSVZ
+#myAR = normalize(merge(ARhs...); mode=:probability)
+mygag = normalize(merge(gaghs...); mode=:probability)
+gagcdf = cdf(merge(gaghs...))
+#KSVZAR = normalize(KSVZ_ARs; mode=:probability)
+KSVZcdf = cdf(KSVZgag)
+
+fig, ax = plt.subplots(figsize=(6, 4))
+ax.step(KSVZgag.edges[1][2:end], KSVZcdf; where="pre", lw=3, color=c1)
+ax.step(mygag.edges[1][2:end], gagcdf; where="pre", lw=3, color=c2, alpha=0.4)
+plt.xlim([-16.5,-12])
+plt.xlabel("Anomaly Ratio E/N")
+plt.ylabel("Probability")
+plt.savefig("plots/preliminary2/CDFcompare.pdf")
+#################################################
+=#
 
 #=
 # Make comparison plot E/N pdf of DFSZ vs KSVZ
