@@ -1,8 +1,11 @@
 using StaticArrays
 using Symbolics
-using LaTeXStrings, Plots
+#using LaTeXStrings, Plots
 using FileIO
 using LinearAlgebra
+
+import PyPlot
+const plt = PyPlot
 
 include("helpers.jl")
 include("ksvz.jl")
@@ -37,7 +40,7 @@ end
 function get_data(file; folder="/preliminary2/n"*string(4)*"/")
     model = fname2model(file)
     ARh = read_AR(model; folder=folder*"/")
-    ARh = normalize(ARh; mode=:probability)
+    #ARh = normalize(ARh; mode=:probability)
     gagh = gag_histogram(ARh; mode=:probability)
     gagh = normalize(gagh; mode=:probability)
     return ARh, gagh
@@ -65,7 +68,7 @@ function init_pdf()
 end
 
 function plot_pdf!(H; kwargs...)
-    p1 = plot!(H; lt=:stepbins, lw=2, label="", kwargs...)
+    p1 = plot!(H; lt=:stepbins, lw=1, label="", kwargs...)
     return p1
 end
 
@@ -75,21 +78,49 @@ end
 
 
 # Read KSVZ anomaly ratios from Plakkots data.
-KSVZ_ARs, KSVZgag, n_dw = ksvz("all")
-KSVZcdf = gag_cdf(KSVZ_ARs)
+KSVZ_ARs, KSVZgag, n_dw = ksvz("all"; edges=-50:0.01:50)
+KSVZcdf = cdf(KSVZ_ARs)
 
 ARhs, gaghs = all_data()
-@time gagcdfs = gag_cdf.(gaghs)
+@time gagcdfs = cdf.(gaghs)
 @time ARcdfs = cdf.(ARhs)
 
 # make a histogram of just the abs(EoN - 1.92) part to feed to limit plot
 Arr = rescale_histogram(merge(ARhs...))
 limit(0.68, Arr)
 
-init_cdf()
-plot_cdf!(Arrc, Arr)
+#=
+# Make comparison plot E/N pdf of DFSZ vs KSVZ
+myAR = normalize(merge(ARhs...); mode=:probability)
+KSVZAR = normalize(KSVZ_ARs; mode=:probability)
 
-init_cdf()
-plot_cdf!(Arrc, Arr, xlims=(-2,50))
-init_pdf()
-plot_pdf!(ARh; color=:blue, xlims=(-5,10))
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.stairs(KSVZAR.weights, KSVZAR.edges[1], linewidth=4000, lw=1.5, ec="mediumseagreen", alpha=1)
+ax.stairs(myAR.weights, myAR.edges[1], linewidth=4000, lw=1.5, ec="maroon", alpha=0.4)
+#ax.step(myAR.edges[1][2:end], myAR.weights)
+plt.xlim([-50,50])
+plt.yscale("log")
+plt.ylim([1e-5,3e-1])
+plt.xlabel("Anomaly Ratio E/N")
+plt.ylabel("Probability")
+plt.savefig("plots/preliminary2/PDFcompare.pdf")
+#################################################
+=#
+
+#=
+# Make zoomed in comparison plot E/N pdf of DFSZ vs KSVZ
+myAR = normalize(merge(ARhs...); mode=:probability)
+KSVZAR = normalize(KSVZ_ARs; mode=:probability)
+
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.stairs(KSVZAR.weights, KSVZAR.edges[1], linewidth=4000, fill=true, fc="mediumseagreen", alpha=1)
+ax.stairs(myAR.weights, myAR.edges[1], linewidth=4000, fill=true, fc="maroon", alpha=0.4)
+#ax.step(myAR.edges[1][2:end], myAR.weights)
+plt.xlim([-0,3])
+plt.yscale("log")
+plt.ylim([1e-5,3e-1])
+plt.xlabel("Anomaly Ratio E/N")
+plt.ylabel("Probability")
+plt.savefig("plots/preliminary2/PDFcompareZoom.pdf")
+#################################################
+=#
