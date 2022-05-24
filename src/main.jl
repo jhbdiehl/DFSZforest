@@ -66,16 +66,7 @@ function parallel_alleqn_solve_proc!(
     end
 end
 
-#=
-nHs = []
 for model in generate_all_models()
-    append!(nHs, length(unique(model)))
-end
-sum(nHs .== 8)
-string(nHs[1])
-=#
-
-for model in generate_all_models()[111:end]
     un = unique(model)
     nH = length(un)
     @time begin
@@ -88,23 +79,23 @@ for model in generate_all_models()[111:end]
     as, bs = get_numquads(quads, un, nH)
     myEoN = get_EoNfunc(model)
     end
-    if tot <= 10^10
+    if tot <= 10^8
         # Save all ARs for a specific model
         @time begin
         proc_rs = similar(bs, tot)
         rs_ws = similar(multis, length(proc_rs))
         parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
-        save_AR(model, proc_rs, rs_ws, 1; folder="n"*string(nH)*"/")
+        save_AR(model, proc_rs, rs_ws, 1; folder="test/n"*string(nH)*"/")
         end
     else
-        chunk = 10^8
+        chunk = 10^6
         m=10
         @time for i in 1:m
             @info "Computing round $i of $m"
             proc_rs = similar(bs, chunk)
             rs_ws = similar(multis, length(proc_rs))
             parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
-            save_AR(model, proc_rs, rs_ws, i; folder="n"*string(nH)*"/")
+            save_AR(model, proc_rs, rs_ws, i; folder="test/n"*string(nH)*"/")
         end
     end
 end
@@ -132,87 +123,4 @@ for model in with_replacement_combinations([u1, d1, l1],9)
         @time save_AR(model, proc_rs, rs_ws, 1; folder="n"*string(nH)*"/")
     end
 end
-=#
-
-#Save samples
-#=
-chunk = 10^7
-m=10
-@time for i in 1:m
-    @info "Computing round $i of $m"
-    proc_rs = similar(bs, chunk)
-    rs_ws = similar(multis, length(proc_rs))
-    @time parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot)
-    @time save_AR(model, proc_rs, rs_ws, i)
-end
-=#
-
-# Read and plot data
-#=
-gaghs = similar(3:9, Any)
-for k in 3:9
-    @info "$k"
-    files = readdir("./data/DFSZ_models/preliminary2/n"*string(k))
-    #hist_list = similar(files, Any)
-    @time for (i, file) in enumerate(files)
-        model = fname2model(file)
-
-        tt = read_AR(model; folder="/preliminary2/n"*string(k)*"/")
-        tt = normalize(tt; mode=:probability)
-        p1 = plot(tt, lt=:stepbins, label="", title="$(file[1:end-5])", 
-            xlabel="E/N", ylabel="Probability", xrange=(-10,13),
-            bottom_margin=2Plots.mm, legend=:topright,
-            size=(400,300), lw=2)
-        savefig(p1, "plots/preliminary2/ARs/$(file[1:end-5])_ARs.pdf")
-        #gagh = gag_histogram(tt; mode=:probability)
-        #hist_list[i] = gagh
-    end
-    #gaghs[k-2] = merge(hist_list...)
-end
-
-files = readdir("./data/DFSZ_models/preliminary2/n"*string(8))[1]
-files[1:end-5]
-model = fname2model(files)
-tt = read_AR(model; folder="preliminary2/n"*string(8)*"/")
-plot(tt, lt=:stepbins, xrange=(-10,13))
-gaghs = normalize.(gaghs; mode=:probability)
-gagscdf = gag_cdf.(gaghs)
-
-plot()
-#for gagh in gaghs[1]
-p1 = plot!(gaghs[end], lt=:stepbins, label="", title="DFSZ n=9 axion models PDF", 
-    xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability",
-    bottom_margin=2Plots.mm, legend=:topright,
-    size=(400,300), lw=2)
-#end
-plot!()
-savefig(p1, "plots/preliminary/n9_pdf.pdf")
-
-plot()
-for gagh in gaghs[2:end]
-    p2 = plot!(gagh.edges[1][1:end-1], gag_cdf(gagh), label="", title="DFSZ axion model CDF", 
-        xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability for bigger gaγγ",
-        bottom_margin=2Plots.mm, legend=:topright,
-        size=(400,300), lw=2)
-end
-p3 = plot!()
-savefig(p3, "plots/preliminary/alln_cdf.pdf")
-
-
-
-# example plot
-model = fname2model(readdir("./data/DFSZ_models/n3")[1])
-fname=model2string(model)
-lab = fname[1:11]*"\n    "*fname[12:20]*"\n    "*fname[21:end]
-p1 = plot(gagh, lt=:stepbins, label=lab, title="DFSZ axion model PDF", 
-    xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability",
-    bottom_margin=2Plots.mm, legend=:topright,
-    size=(400,300), lw=2)
-savefig(p1, "plots/test.pdf")
-
-p2 = plot(gagh.edges[1][1:end-1], gagcdf, label=lab, title="DFSZ axion model CDF", 
-    xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability for bigger gaγγ",
-    bottom_margin=2Plots.mm, legend=:topright,
-    size=(400,300), lw=2)
-savefig(p2, "plots/test2.pdf")
 =#
