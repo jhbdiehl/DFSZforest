@@ -2,7 +2,7 @@
     Careful! This ignores different quadrilinears leading to the same condition! This is maybe not the behavior we want!
     (Also this function is incredibly dirty, holy cow!)
 """
-function get_quads(model; old=false)
+function get_quads(model; old=false, p1=u1, p2=d1, valp1=1, valp2=1)
     vars = unique(model)
     us = Num[]
     for u in [u1, u2, u3]
@@ -39,7 +39,11 @@ function get_quads(model; old=false)
     fillones = (fillones .== 1) .* 2//1 .- 1//1 # weird hack to make sure the array contains only Ints, because unique() does not work with negative floats and symbols
     quads .*= fillones
     quads .*= (length.(string.(quads)) .<= 7) .+ 1//1 # weird way of multiplying all quads by 2 if they only contain two different higgs. This is so sum(abs(higgs)) == 4
-    quads = quads[isequal.(quads, 2//1 * d1 + 2//1 * u1) .!= 1//1] # effectively is not equal...
+    if valp1 + valp2 == 2
+        quads = quads[isequal.(quads, 2//1 * p1 + 2//1 * p2) .!= 1//1] # effectively is not equal...
+    else
+        quads = quads[isequal.(quads, 2//1 * p1 - 2//1 * p2) .!= 1//1] # effectively is not equal...
+    end
     #quads .*= 2//1 # now all quads are multiplied by two. This ensures type stability and does not affect the endresult!
     #return quads, [1 for i in 1:length(quads)]
     quads = quads[isequal.(quads, 0) .== 0] # remove quads that dont give sensible conditions
@@ -131,12 +135,12 @@ function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<
     @info "Done!"
 end
 
-function get_EoNfunc(model)
+function get_EoNfunc(model; p1=u1, p2=d1, valp1=1, valp2=1)
     un = unique(model)
     nH = length(un)
-    notu1d1 = isequal.(un,u1) .+ isequal.(un,d1) .== false
+    notu1d1 = isequal.(un,p1) .+ isequal.(un,p2) .== false
     EoN = EoverN(model...)
-    EoN = substitute(EoN, Dict(u1=>1,d1=>1))
+    EoN = substitute(EoN, Dict(p1=>valp1,p2=>valp2))
     myEoNtmp = build_function(EoN, un[notu1d1])
     myEoN = eval(myEoNtmp)
 end
@@ -169,13 +173,13 @@ _vecvec(mat) = [mat[i,:] for i in 1:size(mat,1)]
 _vecvecvec(mat) = [[mat[j,:,i] for i in 1:size(mat,3)] for j in 1:size(mat,1)]
 
 
-function get_numquads(quads, un, nH)
-    notu1d1 = isequal.(un,u1) .+ isequal.(un,d1) .== false
+function get_numquads(quads, un, nH; p1=u1, p2 = d1, valp1=1, valp2=1)
+    notu1d1 = isequal.(un,p1) .+ isequal.(un,p2) .== false
     numquads = zeros(Int8,length(quads), nH-2)
 
     u1d1dict = Dict{Num, Int8}(un .=> 0)
-    u1d1dict[u1] = 1
-    u1d1dict[d1] = 1
+    u1d1dict[p1] = valp1
+    u1d1dict[p2] = valp2
     bs = SVector{length(quads), Float64}(-1 .* Symbolics.value.(substitute.(quads, (u1d1dict,))))
 
     for i in 1:nH-2

@@ -67,18 +67,22 @@ function parallel_alleqn_solve_proc!(
 end
 
 
+dataset = "220524-preliminary3-d11l1-1"
+
 for model in generate_all_models()
+    p1, p2 = u1, l1
+    valp1, valp2 = 1, -1
     un = unique(model)
     nH = length(un)
     @time begin
-    quads, multis = get_quads(model)
+    quads, multis = get_quads(model; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
     tot = binomial(length(quads),nH-2)
     @info ""
     @info "Next model group: $model"
     @info ""
     @printf "Your model-group has %.3E models \n" tot
-    as, bs = get_numquads(quads, un, nH)
-    myEoN = get_EoNfunc(model)
+    as, bs = get_numquads(quads, un, nH; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
+    myEoN = get_EoNfunc(model; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
     end
     if tot <= 10^8
         # Save all ARs for a specific model
@@ -86,7 +90,7 @@ for model in generate_all_models()
         proc_rs = similar(bs, tot)
         rs_ws = similar(multis, length(proc_rs))
         parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
-        save_AR(model, proc_rs, rs_ws, 1; folder="220524-preliminary3/n"*string(nH)*"/")
+        save_AR(model, proc_rs, rs_ws, 1; folder=dataset*"/n"*string(nH)*"/")
         end
     else
         chunk = 10^6
@@ -96,7 +100,7 @@ for model in generate_all_models()
             proc_rs = similar(bs, chunk)
             rs_ws = similar(multis, length(proc_rs))
             parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
-            save_AR(model, proc_rs, rs_ws, i; folder="220524-preliminary3/n"*string(nH)*"/")
+            save_AR(model, proc_rs, rs_ws, i; folder=dataset*"/n"*string(nH)*"/")
         end
     end
 end
@@ -130,17 +134,17 @@ end
 #=
 for k in 3:9
     @info "$k"
-    files = readdir("./data/DFSZ_models/220524-preliminary3/n"*string(k))
+    files = readdir("./data/DFSZ_models/"*dataset*"/n"*string(k))
     #hist_list = similar(files, Any)
     @time for (i, file) in enumerate(files)
         model = fname2model(file)
-        tt = read_AR(model; folder="/220524-preliminary3/n"*string(k)*"/")
+        tt = read_AR(model; folder="/"*dataset*"/n"*string(k)*"/")
         tt = normalize(tt; mode=:probability)
         p1 = plot(tt, lt=:stepbins, label="", title="$(file[1:end-5])", 
             xlabel="E/N", ylabel="Probability", xrange=(-10,13),
             bottom_margin=2Plots.mm, legend=:topright,
             size=(400,300), lw=2)
-        savefig(p1, "plots/220524-preliminary3/ARs/$(file[1:end-5])_ARs.pdf")
+        savefig(p1, "plots/"*dataset*"/ARs/$(file[1:end-5])_ARs.pdf")
         #gagh = gag_histogram(tt; mode=:probability)
         #hist_list[i] = gagh
     end
