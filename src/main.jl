@@ -66,6 +66,7 @@ function parallel_alleqn_solve_proc!(
     end
 end
 
+println("test")
 for model in generate_all_models()
     un = unique(model)
     nH = length(un)
