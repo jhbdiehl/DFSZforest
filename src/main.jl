@@ -66,6 +66,7 @@ function parallel_alleqn_solve_proc!(
     end
 end
 
+
 for model in generate_all_models()
     un = unique(model)
     nH = length(un)
@@ -85,7 +86,7 @@ for model in generate_all_models()
         proc_rs = similar(bs, tot)
         rs_ws = similar(multis, length(proc_rs))
         parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
-        save_AR(model, proc_rs, rs_ws, 1; folder="test/n"*string(nH)*"/")
+        save_AR(model, proc_rs, rs_ws, 1; folder="220524-preliminary3/n"*string(nH)*"/")
         end
     else
         chunk = 10^6
@@ -95,7 +96,7 @@ for model in generate_all_models()
             proc_rs = similar(bs, chunk)
             rs_ws = similar(multis, length(proc_rs))
             parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
-            save_AR(model, proc_rs, rs_ws, i; folder="test/n"*string(nH)*"/")
+            save_AR(model, proc_rs, rs_ws, i; folder="220524-preliminary3/n"*string(nH)*"/")
         end
     end
 end
@@ -122,5 +123,27 @@ for model in with_replacement_combinations([u1, d1, l1],9)
         @time parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot)
         @time save_AR(model, proc_rs, rs_ws, 1; folder="n"*string(nH)*"/")
     end
+end
+=#
+
+# Plot data
+#=
+for k in 3:9
+    @info "$k"
+    files = readdir("./data/DFSZ_models/220524-preliminary3/n"*string(k))
+    #hist_list = similar(files, Any)
+    @time for (i, file) in enumerate(files)
+        model = fname2model(file)
+        tt = read_AR(model; folder="/220524-preliminary3/n"*string(k)*"/")
+        tt = normalize(tt; mode=:probability)
+        p1 = plot(tt, lt=:stepbins, label="", title="$(file[1:end-5])", 
+            xlabel="E/N", ylabel="Probability", xrange=(-10,13),
+            bottom_margin=2Plots.mm, legend=:topright,
+            size=(400,300), lw=2)
+        savefig(p1, "plots/220524-preliminary3/ARs/$(file[1:end-5])_ARs.pdf")
+        #gagh = gag_histogram(tt; mode=:probability)
+        #hist_list[i] = gagh
+    end
+    #gaghs[k-2] = merge(hist_list...)
 end
 =#

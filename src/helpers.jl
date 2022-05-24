@@ -2,7 +2,7 @@
     Careful! This ignores different quadrilinears leading to the same condition! This is maybe not the behavior we want!
     (Also this function is incredibly dirty, holy cow!)
 """
-function get_quads(model)
+function get_quads(model; old=false)
     vars = unique(model)
     us = Num[]
     for u in [u1, u2, u3]
@@ -12,14 +12,14 @@ function get_quads(model)
             nothing
         end
     end
-    doublets = collect(powerset(vars, 2,2))
-    diffs = [length(setdiff(doublets[i], us)) for i in 1:length(doublets)]
-    sig = isodd.(diffs) .* 2 .- 1 # lifehack! Maps BitVector (0 for false, 1 for true) to (-1 for false and 1 for true)
-    sig = hcat(sig, ones(size(sig)))
-    doublets = permutedims(hcat(doublets...))
-    doublets .*= Int64.(sig).* 2//1 .* 1//2
-    doublets = [doublets[i,:] for i in 1:size(doublets, 1)]
-    allquads = collect(powerset(doublets, 2,2))
+    
+    doublets = get_doublets(vars, us)
+    
+    if old == true
+        allquads = collect(powerset(doublets, 2,2)) # This does not take conditions like (ue) (ue) into account, that dont produce new E/N values but should be important for multiplicities!
+    else
+        allquads = collect(with_replacement_combinations(doublets, 2))
+    end
     allquads = permutedims(hcat(allquads...))
     allquads_conj = deepcopy(allquads)
     allquads_conj[:,1] .*= -1//1
@@ -33,19 +33,30 @@ function get_quads(model)
     #println(length(allquads))
     #uniquads = unique(allquads, dims=1) # remove all duplicates
     #println(length(uniquads))
-    uniquads = allquads
-    fillones = substitute(uniquads, Dict([var => 1//1 for var in vars]))
+    quads = allquads
+    fillones = substitute(quads, Dict([var => 1//1 for var in vars]))
     fillones = (sign.(fillones) .== 0) + sign.(fillones) # make sign return 1 if element = 0
     fillones = (fillones .== 1) .* 2//1 .- 1//1 # weird hack to make sure the array contains only Ints, because unique() does not work with negative floats and symbols
-    uniquads .*= fillones
-    quads = uniquads[isequal.(uniquads, d1+u1) .!= 1//1] # effectively is not equal...
+    quads .*= fillones
     quads .*= (length.(string.(quads)) .<= 7) .+ 1//1 # weird way of multiplying all quads by 2 if they only contain two different higgs. This is so sum(abs(higgs)) == 4
+    quads = quads[isequal.(quads, 2//1 * d1 + 2//1 * u1) .!= 1//1] # effectively is not equal...
     #quads .*= 2//1 # now all quads are multiplied by two. This ensures type stability and does not affect the endresult!
     #return quads, [1 for i in 1:length(quads)]
+    quads = quads[isequal.(quads, 0) .== 0] # remove quads that dont give sensible conditions
     quads = countmap(quads)
     return collect(keys(quads)), collect(values(quads))
 end
 
+function get_doublets(vars, us)
+    doublets = collect(powerset(vars, 2,2))
+    diffs = [length(setdiff(doublets[i], us)) for i in 1:length(doublets)]
+    sig = isodd.(diffs) .* 2 .- 1 # lifehack! Maps BitVector (0 for false, 1 for true) to (-1 for false and 1 for true)
+    sig = hcat(sig, ones(size(sig)))
+    doublets = permutedims(hcat(doublets...))
+    doublets .*= Int64.(sig).* 2//1 .* 1//2
+    doublets = [doublets[i,:] for i in 1:size(doublets, 1)]
+    return doublets
+end
 """
     Calculate Anomaly Ratio, given PQ charges of up- and down quarks as well as leptons.
 """
