@@ -67,10 +67,13 @@ function parallel_alleqn_solve_proc!(
 end
 
 
-dataset = "220524-preliminary3-d11l1-1"
+dataset = "220524-preliminary3-u1u2"
 
-for model in generate_all_models()
-    p1, p2 = u1, l1
+a = generate_all_models()
+a = a[sum.([isequal.(u2, elem) for elem in a]) .!= 0]
+
+for model in a
+    p1, p2 = u1, u2
     valp1, valp2 = 1, -1
     un = unique(model)
     nH = length(un)
@@ -131,7 +134,7 @@ end
 =#
 
 # Plot data
-#=
+=
 for k in 3:9
     @info "$k"
     files = readdir("./data/DFSZ_models/"*dataset*"/n"*string(k))
