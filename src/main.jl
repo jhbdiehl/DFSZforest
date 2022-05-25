@@ -67,43 +67,46 @@ function parallel_alleqn_solve_proc!(
 end
 
 
-dataset = "220524-preliminary3-u1u2"
+dataset = "220525-preliminary4bilins"
 
 a = generate_all_models()
-a = a[sum.([isequal.(u2, elem) for elem in a]) .!= 0]
 
-for model in a
-    p1, p2 = u1, u2
-    valp1, valp2 = 1, -1
-    un = unique(model)
-    nH = length(un)
-    @time begin
-    quads, multis = get_quads(model; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
-    tot = binomial(length(quads),nH-2)
-    @info ""
-    @info "Next model group: $model"
-    @info ""
-    @printf "Your model-group has %.3E models \n" tot
-    as, bs = get_numquads(quads, un, nH; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
-    myEoN = get_EoNfunc(model; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
-    end
-    if tot <= 10^8
-        # Save all ARs for a specific model
+for model in a[1:10]
+    bilins = unique(collect(combinations(model,2)))
+    goodbilins = bilins[length.(unique.(bilins)) .== 2]
+    for bilin in goodbilins
+        p1, p2 = bilin[1], bilin[2]
+        valp1, valp2 = bilinvals(bilin)
+        un = unique(model)
+        nH = length(un)
         @time begin
-        proc_rs = similar(bs, tot)
-        rs_ws = similar(multis, length(proc_rs))
-        parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
-        save_AR(model, proc_rs, rs_ws, 1; folder=dataset*"/n"*string(nH)*"/")
+        quads, multis = get_quads(model; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
+        tot = binomial(length(quads),nH-2)
+        @info ""
+        @info "Next model group: $model with bilinear $bilin" 
+        @info ""
+        @printf "Your model-group has %.3E models \n" tot
+        as, bs = get_numquads(quads, un, nH; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
+        myEoN = get_EoNfunc(model; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
         end
-    else
-        chunk = 10^6
-        m=10
-        @time for i in 1:m
-            @info "Computing round $i of $m"
-            proc_rs = similar(bs, chunk)
+        if tot <= 10^8
+            # Save all ARs for a specific model
+            @time begin
+            proc_rs = similar(bs, tot)
             rs_ws = similar(multis, length(proc_rs))
-            parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
-            save_AR(model, proc_rs, rs_ws, i; folder=dataset*"/n"*string(nH)*"/")
+            parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
+            save_AR(model, proc_rs, rs_ws, 1; folder=dataset*"/n"*string(nH)*"/", bilin=bilin)
+            end
+        else
+            chunk = 10^6
+            m=10
+            @time for i in 1:m
+                @info "Computing round $i of $m"
+                proc_rs = similar(bs, chunk)
+                rs_ws = similar(multis, length(proc_rs))
+                parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
+                save_AR(model, proc_rs, rs_ws, i; folder=dataset*"/n"*string(nH)*"/", bilin=bilin)
+            end
         end
     end
 end
@@ -133,23 +136,31 @@ for model in with_replacement_combinations([u1, d1, l1],9)
 end
 =#
 
+
 # Plot data
 =
 for k in 3:9
     @info "$k"
-    files = readdir("./data/DFSZ_models/"*dataset*"/n"*string(k))
+    savefolder = "./plots/"*dataset*"/ARs/n"*string(k)
+    mkpath(savefolder)
+    folders = readdir("./data/DFSZ_models/"*dataset*"/n"*string(k); join=true)
     #hist_list = similar(files, Any)
-    @time for (i, file) in enumerate(files)
-        model = fname2model(file)
-        tt = read_AR(model; folder="/"*dataset*"/n"*string(k)*"/")
-        tt = normalize(tt; mode=:probability)
-        p1 = plot(tt, lt=:stepbins, label="", title="$(file[1:end-5])", 
-            xlabel="E/N", ylabel="Probability", xrange=(-10,13),
-            bottom_margin=2Plots.mm, legend=:topright,
-            size=(400,300), lw=2)
-        savefig(p1, "plots/"*dataset*"/ARs/$(file[1:end-5])_ARs.pdf")
-        #gagh = gag_histogram(tt; mode=:probability)
-        #hist_list[i] = gagh
+    for folder in folders
+        files = readdir(folder)
+        @time for (i, file) in enumerate(files)
+            println(file)
+            model = fname2model(file)
+            bilin = fname2bilin(file)
+            tt = read_AR(model; folder=dataset*"/n"*string(k), bilin=bilin)
+            tt = normalize(tt; mode=:probability)
+            p1 = plot(tt, lt=:stepbins, label="", title="$(file[1:end-5])", 
+                xlabel="E/N", ylabel="Probability", xrange=(5/3-9,5/3+9),
+                bottom_margin=2Plots.mm, legend=:topright,
+                size=(400,300), lw=2)
+            savefig(p1, savefolder*"/$(file[1:end-5])_ARs.pdf")
+            #gagh = gag_histogram(tt; mode=:probability)
+            #hist_list[i] = gagh
+        end
     end
     #gaghs[k-2] = merge(hist_list...)
 end

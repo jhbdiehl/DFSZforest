@@ -104,18 +104,51 @@ end
 function fname2model(model_str)
     args = split(model_str, "_")
     args[end] = split(args[end], ".")[1]
-    symargs = similar(args, Num)
-    for var in [u1, u2, u3, d1, d2, d3, l1, l2, l3]
-        symargs[args .== String(Symbol(var))] .= var
+    symargs = string2num(args)
+    return symargs[2:end-1]
+end
+
+function bilin2string(bilin)
+    if bilin === nothing
+        return ""
+    else
+        return "_bl="*string(bilin[1])*"-"*string(bilin[2])
     end
-    return symargs[2:end]
+end
+
+function fname2bilin(model_str)
+    args = split(model_str, "_")
+    args[end] = split(args[end], ".")[1]
+    bilin = split(args[end], "=")[2]
+    bilin = split(bilin, "-")
+    symargs = string2num(bilin)
+    return symargs
+end
+
+function string2num(varlist)
+    symargs = similar(varlist, Num)
+    for var in [u1, u2, u3, d1, d2, d3, l1, l2, l3]
+        symargs[varlist .== String(Symbol(var))] .= var
+    end
+    return symargs
+end
+
+function bilinvals(bilin)
+    bstring = bilin2string(bilin)
+    NrOfUs = length(findall( x -> x == 'u', bstring))
+    if isodd(NrOfUs)
+        return 1, 1
+    elseif iseven(NrOfUs)
+        return 1, -1
+    end
 end
 
 """
     Save Anomaly Ratios E/N. Two modes: :hist saves E/N as histogram data (2e5 datapoints, saves time and space for huge datasets), :all (store every single datapoint separately, may be prohibitive above 1e8?)
 """
-function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="")
+function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing)
     fname = model2string(model)
+    bilinname = bilin2string(bilin)
     good_idxs = findall(!isnan, proc_rs)
     good_proc_rs = proc_rs[good_idxs]
     good_rs_ws = rs_ws[good_idxs]
@@ -124,13 +157,15 @@ function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<
 
     @info "Saving..."
 
-    if isfile("./data/DFSZ_models/"*folder*fname*".jld2") && i != 1 # i.e. overwrite if file exists before calculation
-        cm_old = FileIO.load("./data/DFSZ_models/"*folder*fname*".jld2", "ARs")
+    savefile = "./data/DFSZ_models/"*folder*"/"*fname*"/"*fname*bilinname*".jld2"
+
+    if isfile(savefile) && i != 1 # i.e. overwrite if file exists before calculation
+        cm_old = FileIO.load(savefile, "ARs")
         cm_new = merge(cm_old, ARh)
     else
         cm_new = ARh
     end
-    FileIO.save("./data/DFSZ_models/"*folder*fname*".jld2", Dict("ARs" => cm_new))
+    FileIO.save(savefile, Dict("ARs" => cm_new))
 
     @info "Done!"
 end
@@ -164,9 +199,10 @@ function checks(tot, nsamps, un)
 end
 
 
-function read_AR(model; folder="")
+function read_AR(model; folder="", bilin=nothing)
     fname = model2string(model)
-    return FileIO.load("./data/DFSZ_models/"*folder*fname*".jld2", "ARs")
+    bilinname=bilin2string(bilin)
+    return FileIO.load("./data/DFSZ_models/"*folder*"/"*fname*"/"*fname*bilinname*".jld2", "ARs")
 end
 
 _vecvec(mat) = [mat[i,:] for i in 1:size(mat,1)]
