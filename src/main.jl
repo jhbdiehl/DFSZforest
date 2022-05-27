@@ -67,12 +67,12 @@ function parallel_alleqn_solve_proc!(
 end
 
 
-dataset = "220525-preliminary4bilins"
+dataset = "220527-preliminary4bilins"
 
 a = generate_all_models()
 
-for model in a[1:10]
-    bilins = unique(collect(combinations(model,2)))
+for model in a[length.(unique.(a)) .== 8]
+    bilins = unique(sort.(collect(combinations(model,2)), by=x->Symbol(x)))
     goodbilins = bilins[length.(unique.(bilins)) .== 2]
     for bilin in goodbilins
         p1, p2 = bilin[1], bilin[2]
@@ -89,7 +89,7 @@ for model in a[1:10]
         as, bs = get_numquads(quads, un, nH; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
         myEoN = get_EoNfunc(model; p1=p1, p2=p2, valp1=valp1, valp2=valp2)
         end
-        if tot <= 10^8
+        if tot <= 10^9
             # Save all ARs for a specific model
             @time begin
             proc_rs = similar(bs, tot)
@@ -98,7 +98,7 @@ for model in a[1:10]
             save_AR(model, proc_rs, rs_ws, 1; folder=dataset*"/n"*string(nH)*"/", bilin=bilin)
             end
         else
-            chunk = 10^6
+            chunk = 10^8
             m=10
             @time for i in 1:m
                 @info "Computing round $i of $m"
@@ -138,8 +138,8 @@ end
 
 
 # Plot data
-=
-for k in 3:9
+#=
+for k in 5:5
     @info "$k"
     savefolder = "./plots/"*dataset*"/ARs/n"*string(k)
     mkpath(savefolder)
@@ -165,3 +165,32 @@ for k in 3:9
     #gaghs[k-2] = merge(hist_list...)
 end
 =#
+
+for k in 4:4
+    @info "$k"
+    savefolder = "./plots/"*dataset*"/ARs/n"*string(k)
+    mkpath(savefolder)
+    folders = readdir("./data/DFSZ_models/"*dataset*"/n"*string(k); join=true)
+    
+    for folder in folders
+        files = readdir(folder)
+        hist_list = similar(files, Any)
+        @time for (i, file) in enumerate(files)
+            model = fname2model(file)
+            bilin = fname2bilin(file)
+            tt = read_AR(model; folder=dataset*"/n"*string(k), bilin=bilin)
+            tt = normalize(tt; mode=:probability)
+            #gagh = gag_histogram(tt; mode=:probability)
+            hist_list[i] = tt
+        end
+        tttot = merge(hist_list...)
+        type = split(folder, "/")[end]
+        println(type)
+        p1 = plot(tttot, lt=:stepbins, label="", title="$(type)", 
+        xlabel="E/N", ylabel="Probability", xrange=(5/3-9,5/3+9),
+        bottom_margin=2Plots.mm, legend=:topright,
+        size=(400,300), lw=2)
+        savefig(p1, savefolder*"/full_$(type)_ARs.pdf")
+    end
+    #gaghs[k-2] = merge(hist_list...)
+end
