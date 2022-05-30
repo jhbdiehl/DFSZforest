@@ -108,11 +108,25 @@ function fname2model(model_str)
     return symargs[2:end-1]
 end
 
+function fname2m(model_str)
+    args = split(model_str, "/")[end]
+    args = split(args, "n")[1]
+    return args
+end
+
 function bilin2string(bilin)
     if bilin === nothing
         return ""
     else
         return "_bl="*string(bilin[1])*"-"*string(bilin[2])
+    end
+end
+
+function m2string(m)
+    if m == NaN
+        return ""
+    else
+        return string(m)
     end
 end
 
@@ -146,7 +160,7 @@ end
 """
     Save Anomaly Ratios E/N. Two modes: :hist saves E/N as histogram data (2e5 datapoints, saves time and space for huge datasets), :all (store every single datapoint separately, may be prohibitive above 1e8?)
 """
-function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing)
+function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing, ms=NaN)
     fname = model2string(model)
     bilinname = bilin2string(bilin)
     good_idxs = findall(!isnan, proc_rs)
@@ -157,7 +171,11 @@ function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<
 
     @info "Saving..."
 
-    savefile = "./data/DFSZ_models/"*folder*"/"*fname*"/"*fname*bilinname*".jld2"
+    if ms==NaN
+        savefile = "./data/DFSZ_models/"*folder*"/"*fname*"/"*fname*bilinname*".jld2"
+    else
+        savefile = "./data/DFSZ_models/"*folder*"/"*string(ms)*fname*"/"*fname*bilinname*".jld2"
+    end
 
     if isfile(savefile) && i != 1 # i.e. overwrite if file exists before calculation
         cm_old = FileIO.load(savefile, "ARs")
@@ -199,10 +217,11 @@ function checks(tot, nsamps, un)
 end
 
 
-function read_AR(model; folder="", bilin=nothing)
+function read_AR(model; folder="", bilin=nothing, m=NaN)
     fname = model2string(model)
     bilinname=bilin2string(bilin)
-    return FileIO.load("./data/DFSZ_models/"*folder*"/"*fname*"/"*fname*bilinname*".jld2", "ARs")
+    m = m2string(m)
+    return FileIO.load("./data/DFSZ_models/"*folder*"/"*m*fname*"/"*fname*bilinname*".jld2", "ARs")
 end
 
 _vecvec(mat) = [mat[i,:] for i in 1:size(mat,1)]
@@ -308,6 +327,33 @@ function generate_all_models()
     end
     _vecvec(model_list[:,2:end]')
 end
+
+_makeuniqueoptions(a,b,c) = [
+    [a, a, a],
+    [a, a, b],
+    [a, b, c]
+]
+
+function generate_unique_models()
+    us = _makeuniqueoptions(u1,u2,u3)
+    ds = _makeuniqueoptions(d1,d2,d3)
+    ls = _makeuniqueoptions(l1,l2,l3)
+
+    #tmp_models = collect(Iterators.product(us, ds, ls));
+    m = [1,3,1]
+    multis = collect(Iterators.product(m,m,m))
+    #println(tmp_models)
+    #length(tmp_models)
+    model_list = [u1 for i in 1:9]#similar([1 for i in 1:length(tmp_models)], Any)
+    multi_list = []
+    for (i, tmp) in enumerate(collect(Iterators.product(us, ds, ls)))
+        mult = *(multis[i]...)
+        append!(multi_list, mult)
+        model_list = hcat(model_list, [tmp[1]...,tmp[2]...,tmp[3]...])
+    end
+    return _vecvec(model_list[:,2:end]'), multi_list
+end
+
 
 function I_static(::Val{N}, ::Type{T}) where {N,T<:Real}
     convert(SMatrix{N,N,T}, Diagonal(SVector(ntuple(i -> one(T), Val(N)))))

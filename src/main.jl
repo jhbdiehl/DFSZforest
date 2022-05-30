@@ -67,11 +67,12 @@ function parallel_alleqn_solve_proc!(
 end
 
 
-dataset = "220527-preliminary4bilins"
+dataset = "220530-mediumrun"
 
-a = generate_all_models()
+#a = generate_all_models()
+b, ms = generate_unique_models()
 
-for model in a[length.(unique.(a)) .== 8]
+@time for (k, model) in enumerate(b) #a[length.(unique.(a)) .== 8]
     bilins = unique(sort.(collect(combinations(model,2)), by=x->Symbol(x)))
     goodbilins = bilins[length.(unique.(bilins)) .== 2]
     for bilin in goodbilins
@@ -95,7 +96,7 @@ for model in a[length.(unique.(a)) .== 8]
             proc_rs = similar(bs, tot)
             rs_ws = similar(multis, length(proc_rs))
             parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
-            save_AR(model, proc_rs, rs_ws, 1; folder=dataset*"/n"*string(nH)*"/", bilin=bilin)
+            save_AR(model, proc_rs, rs_ws, 1; folder=dataset*"/n"*string(nH)*"/", bilin=bilin, ms=ms[k])
             end
         else
             chunk = 10^8
@@ -105,11 +106,17 @@ for model in a[length.(unique.(a)) .== 8]
                 proc_rs = similar(bs, chunk)
                 rs_ws = similar(multis, length(proc_rs))
                 parallel_randeqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
-                save_AR(model, proc_rs, rs_ws, i; folder=dataset*"/n"*string(nH)*"/", bilin=bilin)
+                save_AR(model, proc_rs, rs_ws, i; folder=dataset*"/n"*string(nH)*"/", bilin=bilin, ms=ms[k])
             end
         end
     end
 end
+
+@info ""
+@info ""
+@info "Start plotting!!!"
+@info ""
+@info ""
 
 
 # This would be the procedure to actually calculate really all models!
@@ -166,31 +173,43 @@ for k in 5:5
 end
 =#
 
-for k in 4:4
+@time for k in 4:9
     @info "$k"
     savefolder = "./plots/"*dataset*"/ARs/n"*string(k)
     mkpath(savefolder)
     folders = readdir("./data/DFSZ_models/"*dataset*"/n"*string(k); join=true)
     
-    for folder in folders
+    tttot_list = similar(folders, Any)
+    for (j, folder) in enumerate(folders)
+        m = fname2m(folder)
         files = readdir(folder)
         hist_list = similar(files, Any)
         @time for (i, file) in enumerate(files)
             model = fname2model(file)
             bilin = fname2bilin(file)
-            tt = read_AR(model; folder=dataset*"/n"*string(k), bilin=bilin)
+            tt = read_AR(model; folder=dataset*"/n"*string(k), bilin=bilin, m=m)
             tt = normalize(tt; mode=:probability)
             #gagh = gag_histogram(tt; mode=:probability)
             hist_list[i] = tt
         end
         tttot = merge(hist_list...)
+        tttot = normalize(tttot; mode=:probability)
+        tttot.weights .*= parse(Int,string(m))
+        tttot_list[j] = tttot
         type = split(folder, "/")[end]
         println(type)
-        p1 = plot(tttot, lt=:stepbins, label="", title="$(type)", 
+        p2 = plot(tttot, lt=:stepbins, label="", title="$(type)", 
         xlabel="E/N", ylabel="Probability", xrange=(5/3-9,5/3+9),
         bottom_margin=2Plots.mm, legend=:topright,
         size=(400,300), lw=2)
-        savefig(p1, savefolder*"/full_$(type)_ARs.pdf")
+        savefig(p2, savefolder*"/full_$(type)_ARs.pdf")
     end
+    ttall = merge(tttot_list...)
+    ttall = normalize(ttall; mode=:probability)
+    p1 = plot(ttall, lt=:stepbins, label="", title="n$(k)", 
+    xlabel="E/N", ylabel="Probability", xrange=(5/3-9,5/3+9),
+    bottom_margin=2Plots.mm, legend=:topright,
+    size=(400,300), lw=2)
+    savefig(p1, savefolder*"/full_n$(k)_ARs.pdf")
     #gaghs[k-2] = merge(hist_list...)
 end
