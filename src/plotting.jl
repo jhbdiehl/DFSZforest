@@ -16,20 +16,22 @@ include("ksvz.jl")
 #fname=model2string(model)
 #lab = fname[1:11]*"\n    "*fname[12:20]*"\n    "*fname[21:end]
 
-function all_data(;merge=true)
+function all_data(dataset;merge=true)
     gaghs = similar(3:9, Any)
     ARhs = similar(3:9, Any)
     for k in 3:9
         @info "$k"
-        fold = "preliminary2/n"*string(k)
-        files = readdir("./data/DFSZ_models/"*fold)
-        hist1_list = similar(files, Any)
-        hist2_list = similar(files, Any)
-        @time for (i, file) in enumerate(files)
-            ARh, gagh = get_data(file; folder=fold)
-            hist1_list[i] = ARh
-            hist2_list[i] = gagh
-        end
+        fold = dataset*"/n"*string(k)
+        folders = readdir("./data/DFSZ_models/"*fold)
+        for (j, folder) in enumerate(folders)
+            files = readdir("./data/DFSZ_models/"*fold*"/"*folder)
+            hist1_list = similar(files, Any)
+            hist2_list = similar(files, Any)
+            @time for (i, file) in enumerate(files)
+                ARh, gagh = get_data(file; folder=folder)
+                hist1_list[i] = ARh
+                hist2_list[i] = gagh
+            end
         ARhs[k-2] = merge(hist1_list...)
         gaghs[k-2] = merge(hist2_list...)
     end
@@ -38,7 +40,8 @@ end
 
 function get_data(file; folder="/preliminary2/n"*string(4)*"/")
     model = fname2model(file)
-    ARh = read_AR(model; folder=folder*"/")
+    m = fname2m(file)
+    ARh = read_AR(model; folder=folder*"/", m=m)
     #ARh = normalize(ARh; mode=:probability)
     gagh = gag_histogram(ARh; mode=:probability, edges=-16.5:0.001:-12)
     gagh = normalize(gagh; mode=:probability)
@@ -80,7 +83,7 @@ end
 KSVZ_ARs, KSVZgag, n_dw = ksvz("all"; edges=-50:0.01:50)
 KSVZcdf = cdf(KSVZ_ARs)
 
-ARhs, gaghs = all_data()
+ARhs, gaghs = all_data("220530-mediumrun")
 @time gagcdfs = cdf.(gaghs)
 @time ARcdfs = cdf.(ARhs)
 
@@ -96,7 +99,7 @@ c1a = 1.0
 c2a = 0.4
 
 
-#=
+=
 # Plot all n=4 models in one histogram
 myAR = ARhs[2]#normalize(ARhs[2]; mode=:probability)
 fig, ax = plt.subplots(figsize=(6, 4))
@@ -113,7 +116,7 @@ plt.axvline(8/3, ls=":", color="k")
 plt.text(4,200, "symmetry axis 5/3", color="grey")
 plt.text(-5,350, "DFSZ-II", color="k")
 plt.text(4,350, "DFSZ-I", color="k")
-plt.savefig("plots/preliminary2/PDFn4tot.pdf")
+plt.savefig("plots/220530-mediumrun/PDFn4tot.pdf")
 #################################################
 =#
 
