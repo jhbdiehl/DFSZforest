@@ -69,10 +69,11 @@ end
 
 dataset = "220530-mediumrun"
 
-#a = generate_all_models()
+a, ms = generate_all_models()
 b, ms = generate_unique_models()
 
-@time for (k, model) in enumerate(b) #a[length.(unique.(a)) .== 8]
+
+@time for (k, model) in enumerate(a[length.(unique.(a)) .== 4]) #a[length.(unique.(a)) .== 8]
     bilins = unique(sort.(collect(combinations(model,2)), by=x->Symbol(x)))
     goodbilins = bilins[length.(unique.(bilins)) .== 2]
     for bilin in goodbilins
@@ -173,7 +174,7 @@ for k in 5:5
 end
 =#
 
-@time for k in 4:9
+@time for k in 4:4
     @info "$k"
     savefolder = "./plots/"*dataset*"/ARs/n"*string(k)
     mkpath(savefolder)

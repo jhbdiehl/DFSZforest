@@ -325,7 +325,8 @@ function generate_all_models()
     for tmp in collect(Iterators.product(us, ds, ls))
         model_list = hcat(model_list, [tmp[1]...,tmp[2]...,tmp[3]...])
     end
-    _vecvec(model_list[:,2:end]')
+    a = _vecvec(model_list[:,2:end]')
+    return a, ones(Int8, length(a))
 end
 
 _makeuniqueoptions(a,b,c) = [
