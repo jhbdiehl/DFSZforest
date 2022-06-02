@@ -144,10 +144,29 @@ end
 # Read KSVZ anomaly ratios from Plakkots data.
 KSVZ_ARs, KSVZgag, n_dw = ksvz("all"; edges=-50:0.01:50)
 KSVZcdf = cdf(KSVZ_ARs)
+KSVZcdf[5153]
+KSVZ_ARs.edges[1][5153]
 
 ARhs, gaghs = all_data("220530-mediumrun")
 @time gagcdfs = cdf.(gaghs)
 @time ARcdfs = cdf.(ARhs)
+
+
+gagh = normalize(KSVZgag, mode=:probability)
+allgagcdf = cdf(gagh)
+allgagcdf[912]
+gagh.edges[1][912]
+
+gaghs = normalize.(gaghs, mode=:probability)
+allgagcdf = cdf(merge(gaghs...))
+allgagcdf[366]
+gaghs[7].edges[1][365]
+
+ARcdfs[7][100167]
+ARhs[7].edges[1][100167]
+i = 7
+sum(ARhs[i].weights .* (ARhs[i].edges[1][1:end-1] .+ 0.005)) / sum(ARhs[i].weights)
+sum(KSVZ_ARs.weights .* (KSVZ_ARs.edges[1][1:end-1] .+ 0.005)) / sum(KSVZ_ARs.weights)
 
 # make a histogram of just the abs(EoN - 1.92) part to feed to limit plot
 Arr = rescale_histogram(merge(ARhs...))
@@ -163,22 +182,22 @@ c2a = 0.4
 
 #=
 # Plot all n=4 models in one histogram
-myAR = ARhs[2]#normalize(ARhs[2]; mode=:probability)
+myAR = normalize(ARhs[7]; mode=:probability)
 fig, ax = plt.subplots(figsize=(6, 4))
 ax.stairs(myAR.weights, myAR.edges[1], ec=c2, lw=2, alpha=c2a)
 plt.xlim([5/3-20,5/3+20])
 plt.yscale("log")
-plt.ylim([1,4000])
+plt.ylim([1e-5,1])
 plt.xlabel("Anomaly Ratio E/N")
-plt.ylabel("Number of models")
-plt.title(L"All DFSZ-like $n_H = 4$ models")
+plt.ylabel("Probability")
+plt.title(L"All DFSZ-like $n_H = 9$ models")
 plt.axvline(5/3, ls=":", color="grey")
 plt.axvline(2/3, ls=":", color="k")
 plt.axvline(8/3, ls=":", color="k")
-plt.text(4,1000, "symmetry axis 5/3", color="grey")
-plt.text(-5,2000, "DFSZ-II", color="k")
-plt.text(4,2000, "DFSZ-I", color="k")
-plt.savefig("plots/220530-mediumrun/PDFn4tot.pdf")
+#plt.text(4,1000, "symmetry axis 5/3", color="grey")
+#plt.text(-5,2000, "DFSZ-II", color="k")
+#plt.text(4,2000, "DFSZ-I", color="k")
+plt.savefig("plots/220530-mediumrun/PDFn9tot.pdf")
 #################################################
 =#
 
