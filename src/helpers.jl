@@ -1,5 +1,5 @@
 """
-    Careful! This ignores different quadrilinears leading to the same condition! This is maybe not the behavior we want!
+    Careful! This ignores different quadrilinears leading to the same condition! This is maybe not the behavior we want! (Not true anymore!)
     (Also this function is incredibly dirty, holy cow!)
 """
 function get_quads(model; old=false, p1=u1, p2=d1, valp1=1, valp2=1)
@@ -41,8 +41,10 @@ function get_quads(model; old=false, p1=u1, p2=d1, valp1=1, valp2=1)
     quads .*= (length.(string.(quads)) .<= 7) .+ 1//1 # weird way of multiplying all quads by 2 if they only contain two different higgs. This is so sum(abs(higgs)) == 4
     if valp1 + valp2 == 2
         quads = quads[isequal.(quads, 2//1 * p1 + 2//1 * p2) .!= 1//1] # effectively is not equal...
+    elseif valp1 + valp2 == 0
+        quads = quads[isequal.(quads, 2//1 * p1 - 2//1 * p2) .+ isequal.(quads, 2//1 * p2 - 2//1 * p1) .!= 1//1] # effectively is not equal...
     else
-        quads = quads[isequal.(quads, 2//1 * p1 - 2//1 * p2) .!= 1//1] # effectively is not equal...
+        error("I think your bilinear values for the bilinear you used explicitly are not good!")
     end
     #quads .*= 2//1 # now all quads are multiplied by two. This ensures type stability and does not affect the endresult!
     #return quads, [1 for i in 1:length(quads)]
@@ -147,13 +149,13 @@ function string2num(varlist)
     return symargs
 end
 
-function bilinvals(bilin)
+function bilinvals(bilin; odd=(1, 1), even=(1, -1))
     bstring = bilin2string(bilin)
     NrOfUs = length(findall( x -> x == 'u', bstring))
     if isodd(NrOfUs)
-        return 1, 1
+        return odd
     elseif iseven(NrOfUs)
-        return 1, -1
+        return even
     end
 end
 
@@ -235,7 +237,7 @@ function get_numquads(quads, un, nH; p1=u1, p2 = d1, valp1=1, valp2=1)
     u1d1dict = Dict{Num, Int8}(un .=> 0)
     u1d1dict[p1] = valp1
     u1d1dict[p2] = valp2
-    bs = SVector{length(quads), Float64}(-1 .* Symbolics.value.(substitute.(quads, (u1d1dict,))))
+    bs = SVector{length(quads), Float64}(-1 .* Symbolics.value.(substitute.(quads, (u1d1dict,))) .+ (2 .* (length.(string.(quads)) .<= 7))) # i.e. set up les normally and add +2 or +0 depending on if its a bilinear or a quadrilinear
 
     for i in 1:nH-2
         mydict = Dict(un .=> 0.0)
@@ -358,4 +360,135 @@ end
 
 function I_static(::Val{N}, ::Type{T}) where {N,T<:Real}
     convert(SMatrix{N,N,T}, Diagonal(SVector(ntuple(i -> one(T), Val(N)))))
+end
+
+function make_idx_bnc(N)
+    for (i,t) in enumerate(TupIter{N}())
+        i > 10_000 && break
+        @assert i == tupidx(t)
+    end
+    bnc = binom_cache(N, 1000);
+    idxarr = similar([1],N);
+    return idxarr, bnc
+end
+
+function parallel_randeqn_solve_proc!(
+    proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
+    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
+    tot::Int, myEoN
+) where N
+
+    idxarr, bnc = make_idx_bnc(N)
+
+    @threads for i in eachindex(proc_rs)
+        @inbounds begin
+            # When using drawer need to allocate indices. Is there a way around?
+            idxs_i =  myidxtup!(idxarr, bnc, rand(1:tot), Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
+            r = mysolve(as, bs, idxs_i)
+            proc_rs[i] = myEoN(r)
+            rs_ws[i] = prod(ws[idxs_i])
+        end
+    end
+end
+
+function parallel_alleqn_solve_proc!(
+    proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
+    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
+    tot::Int, myEoN
+) where N
+
+    idxarr, bnc = make_idx_bnc(N)
+
+    @threads for i in eachindex(proc_rs)
+        @inbounds begin
+            # When using drawer need to allocate indices. Is there a way around?
+            idxs_i =  myidxtup!(idxarr, bnc, i, Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
+            r = mysolve(as, bs, idxs_i)
+            proc_rs[i] = myEoN(r)
+            rs_ws[i] = prod(ws[idxs_i])
+        end
+    end
+end
+
+
+function parallel_alleqn_solve_proc_fullsol!(
+    proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
+    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
+    tot::Int, myEoN
+) where N
+
+    idxarr, bnc = make_idx_bnc(N)
+
+    @threads for i in eachindex(proc_rs)
+        @inbounds begin
+            # When using drawer need to allocate indices. Is there a way around?
+            idxs_i =  myidxtup!(idxarr, bnc, i, Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
+            r = mysolve(as, bs, idxs_i)
+            proc_rs[i] = r
+
+            EoN_rs[i] = myEoN(r)
+            rs_ws[i] = prod(ws[idxs_i])
+        end
+    end
+end
+
+
+function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing, valp1=1, valp2=1, ms=NaN) where L
+    
+    @info "Saving..."
+
+    if i != 1
+        error("i has to be equal to 1. Incremental save not yet supported")
+    end
+    
+    ms=3
+    fname = model2string(model)
+    bilinname = bilin2string(bilin)
+    good_idxs = findall(!isnan, EoN_rs)
+    good_EoN_rs = EoN_rs[good_idxs]
+    good_proc_rs = proc_rs[good_idxs,:]
+    good_rs_ws = rs_ws[good_idxs]
+
+    chi_s = ( abs(valp1) + abs(valp2) ) / 2
+    un = unique(model)
+    nH = length(un)
+
+    mydict = Dict{Num, Float64}(un .=> 0)
+    mydict[bilin[1]]= valp1
+    mydict[bilin[2]]= valp2
+
+    notp1p2 = isequal.(un,bilin[1]) .+ isequal.(un,bilin[2]) .== false
+
+    E = similar(good_EoN_rs)
+    N = similar(good_EoN_rs)
+    Chis = Matrix{Float64}(undef, length(good_EoN_rs), 10)
+    for i in 1:length(good_rs_ws)
+        for (j, higgs) in enumerate(un[notp1p2])
+            mydict[higgs] = good_proc_rs[i][j]
+        end
+        chivec = Symbolics.value.(substitute.(model, (mydict,)))
+        E[i] = 4 * sum(chivec[1:3]) + 1 * sum(chivec[4:6]) + 3 * sum(chivec[7:9])
+        N[i] = 3/2 * sum(chivec[1:6])
+        append!(chivec, chi_s)
+        Chis[i,:] .= chivec #Construct matrix with chi values, last one is charge of the singlet (always 1)
+    end
+
+    tpath = "./data/DFSZ_models/"*folder*"/"
+    if ms == NaN
+        group = fname*"/"*bilinname[2:end]
+    else
+        group = string(ms)*fname*"/"*bilinname[2:end]
+    end
+    
+    if isfile(tpath*"full_n"*string(nH)*".h5") == false
+        h5write(tpath*"full_n"*string(nH)*".h5", "Chis order: u1u2u3d1d2d3l1l2l3s", "")
+    end
+
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/Chis",Chis)
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/E",E)
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/N",N)
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/EoN",good_EoN_rs)
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/multis",good_rs_ws)
+
+    @info "Done!"
 end
