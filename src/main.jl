@@ -6,7 +6,7 @@ using Plots
 using Random: default_rng
 using Symbolics
 using Combinatorics
-using FileIO, JLD2
+using FileIO, JLD2, HDF5
 using LaTeXStrings, Printf
 
 
@@ -34,7 +34,7 @@ function runDFSZ(dataset;log_max_num_mod=9, ns =:all, compute_equivalent_theorie
     end
 
     if ns == :all
-        nothing
+        mya = a
     else
         mya = a[length.(unique.(a)) .∈ Ref(ns)]
         ms = ms[length.(unique.(a)) .∈ Ref(ns)]
@@ -96,10 +96,10 @@ function runDFSZ(dataset;log_max_num_mod=9, ns =:all, compute_equivalent_theorie
 end
 
 
-runDFSZ("220607-fullsolutionsv1"; log_max_num_mod=8, ns=[6], exactly_one_bilinear=false, full_solution=true)
+@time runDFSZ("220609-nbilinears"; log_max_num_mod=9, ns=:all, exactly_one_bilinear=false, full_solution=false)
 
-#fid = h5open("./data/DFSZ_models/test/n5/full_n5.h5")
-#cc = read(fid["3n5_u1_u2_u3_d1_d1_d1_l1_l1_l1"]["bl=d1-l1"]["N"])
+#fid = h5open("./data/DFSZ_models/220607-fullsolutionsv1/n6/full_n6.h5")
+#cc = read(fid["3n6_u1_u2_u3_d1_d1_d2_l1_l1_l1"]["bl=u1-u2"]["N"])
 #close(fid)
 
 @info ""

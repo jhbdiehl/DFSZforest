@@ -473,7 +473,7 @@ function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::
         Chis[i,:] .= chivec #Construct matrix with chi values, last one is charge of the singlet (always 1)
     end
 
-    tpath = "./data/DFSZ_models/"*folder*"/"
+    tpath = "./data/DFSZ_models/"*folder
     if ms == NaN
         group = fname*"/"*bilinname[2:end]
     else
@@ -481,6 +481,7 @@ function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::
     end
     
     if isfile(tpath*"full_n"*string(nH)*".h5") == false
+        mkpath(tpath)
         h5write(tpath*"full_n"*string(nH)*".h5", "Chis order: u1u2u3d1d2d3l1l2l3s", "")
     end
 
