@@ -16,16 +16,22 @@ include("ksvz.jl")
 #fname=model2string(model)
 #lab = fname[1:11]*"\n    "*fname[12:20]*"\n    "*fname[21:end]
 
-dataset="220530-mediumrun"
+dataset="220609-nbilinears"
 
-function all_data(dataset)
-    gaghs = similar(3:9, Any)
-    ARhs = similar(3:9, Any)
-    @time for k in 3:9
-        @info "$k"
-        savefolder = "./plots/"*dataset*"/ARs/n"*string(k)
+function all_data(dataset; ns=:all, do_plot=nothing)
+    if ns == :all
+        ns = collect(3:9)
+    else
+        ns = ns
+    end
+
+    gaghs = similar(ns, Any)
+    ARhs = similar(ns, Any)
+    @time for (k,n) in enumerate(ns)
+        @info "$n"
+        savefolder = "./plots/"*dataset*"/ARs/n"*string(n)
         mkpath(savefolder)
-        folders = readdir("./data/DFSZ_models/"*dataset*"/n"*string(k); join=true)
+        folders = readdir("./data/DFSZ_models/"*dataset*"/n"*string(n); join=true)
         
         ARtot_list = similar(folders, Any)
         gagtot_list = similar(folders, Any)
@@ -37,13 +43,16 @@ function all_data(dataset)
             @time for (i, file) in enumerate(files)
                 model = fname2model(file)
                 bilin = fname2bilin(file)
-                ARh = read_AR(model; folder=dataset*"/n"*string(k), bilin=bilin, m=m)
+                ARh = read_AR(model; folder=dataset*"/n"*string(n), bilin=bilin, m=m)
                 #ARh = normalize(ARh; mode=:probability)
                 gagh = gag_histogram(ARh; mode=:probability, edges=-16.5:0.001:-12)
                 gagh = normalize(gagh; mode=:probability)
                 #gagh = gag_histogram(tt; mode=:probability)
                 hist1_list[i] = ARh
                 hist2_list[i] = gagh
+                if do_plot == :bilinear
+                    plot_AR(ARh, dataset, "ARs/n$n/"*split(file, ".")[1])
+                end
             end
             ARtot = merge(hist1_list...)
             gagtot = merge(hist2_list...)
@@ -52,15 +61,42 @@ function all_data(dataset)
             ARtot.weights .*= parse(Int,string(m))
             ARtot_list[j] = ARtot
             gagtot_list[j] = gagtot
+            if do_plot == :yukawamodel
+                plot_AR(ARtot, dataset, "ARs/n$n/"*split(folder,"/")[end])
+            end
         end
         ARall = merge(ARtot_list...)
         gagall = merge(gagtot_list...)
         gagall = normalize(gagall; mode=:probability)
-        gaghs[k-2] = gagall
-        ARhs[k-2] = ARall
+        gaghs[k] = gagall
+        ARhs[k] = ARall
+        if do_plot == :full
+            plot_AR(ARall, dataset, "ARs/n$n/n$n"*"_fullAR")
+        end
     end
     return ARhs, gaghs
 end
+
+Arhs, gaghs = all_data(dataset; ns=[3], do_plot=:full)
+
+function plot_AR(myAR, dataset, folder; ec="maroon", lw=2, alpha=1.0)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.stairs(myAR.weights, myAR.edges[1], ec=ec, lw=lw, alpha=alpha)
+    plt.xlim([5/3-20,5/3+20])
+    #plt.yscale("log")
+    #plt.ylim([1e-5,1])
+    plt.xlabel("Anomaly Ratio E/N")
+    plt.ylabel("Nr of models")
+    #plt.title(L"All DFSZ-like $n_H = 9$ models")
+    #plt.axvline(5/3, ls=":", color="grey")
+    #plt.axvline(2/3, ls=":", color="k")
+    #plt.axvline(8/3, ls=":", color="k")
+    #plt.text(4,1000, "symmetry axis 5/3", color="grey")
+    #plt.text(-5,2000, "DFSZ-II", color="k")
+    #plt.text(4,2000, "DFSZ-I", color="k")
+    plt.savefig("plots/"*dataset*"/"*folder*".pdf")
+end
+.
 
 #=
 function all_data(dataset;merge=true)
