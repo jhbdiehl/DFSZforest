@@ -159,6 +159,11 @@ function bilinvals(bilin; odd=(1, 1), even=(1, -1))
     end
 end
 
+function bilinsum(bilin)
+    v1, v2 = bilinvals(bilin)
+    return bilin[1] * v1 + bilin[2] * v2
+end
+
 """
     Save Anomaly Ratios E/N. Two modes: :hist saves E/N as histogram data (2e5 datapoints, saves time and space for huge datasets), :all (store every single datapoint separately, may be prohibitive above 1e8?)
 """

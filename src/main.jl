@@ -52,7 +52,7 @@ function runDFSZ(dataset;log_max_num_mod=9, ns =:all, compute_equivalent_theorie
             if exactly_one_bilinear == true
                 terms = quads
             elseif exactly_one_bilinear == false
-                bi = sum.(bilins[i+1:end])
+                bi = bilinsum.(bilins[i+1:end])
                 terms = vcat(quads,bi)
                 multis = vcat(multis, bilin_weights * ones(Int64, size(bi)...))
             end
@@ -107,6 +107,8 @@ end
 @info "Start plotting!!!"
 @info ""
 @info ""
+
+
 
 
 # This would be the procedure to actually calculate really all models!
