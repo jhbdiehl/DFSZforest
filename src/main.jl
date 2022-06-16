@@ -25,7 +25,7 @@ include("./helpers.jl")
         run for only one n value. run for specified bilinears. run all models or run cheaper version with assumed multiplicities.
         run
 """
-function runDFSZ(dataset;log_max_num_mod=9, ns =:all, compute_equivalent_theories=false, exactly_one_bilinear=false, bilin_weights::Integer=1, full_solution=false)
+function runDFSZ(dataset;sample_n_gt=6, sample_log_nr_mods=9, ns =:all, compute_equivalent_theories=false, exactly_one_bilinear=false, bilin_weights::Integer=1, full_solution=false)
 
     if compute_equivalent_theories
         a, ms = generate_all_models()
@@ -52,7 +52,11 @@ function runDFSZ(dataset;log_max_num_mod=9, ns =:all, compute_equivalent_theorie
             if exactly_one_bilinear == true
                 terms = quads
             elseif exactly_one_bilinear == false
-                bi = bilinsum.(bilins[i+1:end])
+                if length(un) <= sample_n_gt
+                    bi = bilinsum.(bilins[i+1:end])
+                else # If you sample all bilins with equal nr of samples, excluding models you already calculated would lead to bias effect!
+                    bi = bilinsum.(bilins[1:end])
+                end
                 terms = vcat(quads,bi)
                 multis = vcat(multis, bilin_weights * ones(Int64, size(bi)...))
             end
@@ -60,7 +64,7 @@ function runDFSZ(dataset;log_max_num_mod=9, ns =:all, compute_equivalent_theorie
             tot = binomial(length(terms),nH-2)
             tott += tot
             myEoN = get_EoNfunc(model; p1=bilin[1], p2=bilin[2], valp1=valp1, valp2=valp2)
-            if tot <= 10^log_max_num_mod && full_solution == false
+            if length(un) <= sample_n_gt && full_solution == false
                 # Save all ARs for a specific model
                 @time begin
                 proc_rs = similar(bs, tot)
@@ -68,7 +72,7 @@ function runDFSZ(dataset;log_max_num_mod=9, ns =:all, compute_equivalent_theorie
                 parallel_alleqn_solve_proc!(proc_rs, rs_ws, as, bs, multis, tot, myEoN)
                 save_AR(model, proc_rs, rs_ws, 1; folder=dataset*"/n"*string(nH)*"/", bilin=bilin, ms=ms[k])
                 end
-            elseif tot <= 10^log_max_num_mod && full_solution == true
+            elseif length(un) <= sample_n_gt && full_solution == true
                 @time begin
                     proc_rs = similar(as, tot)
                     EoN_rs = similar(bs, tot)
@@ -77,7 +81,7 @@ function runDFSZ(dataset;log_max_num_mod=9, ns =:all, compute_equivalent_theorie
                     save_full(model, proc_rs, EoN_rs, rs_ws, 1; folder=dataset*"/n"*string(nH)*"/", bilin=bilin, valp1=valp1, valp2=valp2, ms=ms[k])
                 end
             else
-                chunk = 10^(log_max_num_mod - 1)
+                chunk = 10^(sample_log_nr_mods - 1)
                 m=10
                 @time for i in 1:m
                     @info "Computing round $i of $m"
@@ -96,7 +100,7 @@ function runDFSZ(dataset;log_max_num_mod=9, ns =:all, compute_equivalent_theorie
 end
 
 
-@time runDFSZ("220609-nbilinears"; log_max_num_mod=9, ns=:all, exactly_one_bilinear=false, full_solution=false)
+@time runDFSZ("220616-nbilin_fullsol"; sample_n_gt=6, sample_log_nr_mods=9, ns=[3,4,5], exactly_one_bilinear=false, compute_equivalent_theories=true, full_solution=true)
 
 #fid = h5open("./data/DFSZ_models/220607-fullsolutionsv1/n6/full_n6.h5")
 #cc = read(fid["3n6_u1_u2_u3_d1_d1_d2_l1_l1_l1"]["bl=u1-u2"]["N"])

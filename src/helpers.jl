@@ -336,11 +336,115 @@ function generate_all_models()
     return a, ones(Int8, length(a))
 end
 
-_makeuniqueoptions(a,b,c) = [
-    [a, a, a],
-    [a, a, b],
-    [a, b, c]
+function _makeuniqueoptions(a,b,c; us=nothing, ds=nothing)
+    if us === nothing && ds === nothing
+        return [[a, a, a],
+                [a, a, c],
+                [a, b, c]]
+    elseif us !== nothing && ds === nothing
+        if Symbol.(us) == Symbol.([u1, u1, u1])
+            opt = [[u1,u1,u1]]
+        elseif Symbol.(us) == Symbol.([u1,u1,u2])
+            opt = [[u1,u1,u1], [u1,u1,u2]]
+        elseif Symbol.(us) == Symbol.([u1,u2,u3])
+            opt = [[u1,u1,u1], [u1,u1,u2], [u1,u2,u3]]
+        end
+        return[[a, a, a],
+               [a, a, b],
+               [a, b, c], opt...]
+    elseif us!== nothing && ds !== nothing
+        return[[a, a, a],
+               [a, a, b],
+               [a, b, c], us..., ds...]
+    end
+end
+
+#=
+opt = _makeuniqueoptions(u1,u2,u3)
+
+for nn in [d1,d2,d3]
+    myopt = similar(opt)
+    for (i, o) in enumerate(opt)
+        myopt[i] = [o..., d1]
+        for mynum in unique(o)
+            append!(myopt, Ref([o..., mynum]))
+        end
+    end
+    opt = deepcopy(myopt)
+end
+opt
+unique(opt)
+
+myk = similar(us, 3)
+for (i, u) in enumerate(us)
+    myk[i] = [u..., d1]
+    for mynum in unique(u)
+        append!(myk, Ref([u..., mynum]))
+    end
+end
+us
+myk
+
+myl = similar(myk)
+for (i, k) in enumerate(myk)
+    myl[i] = [k..., d2]
+    for mynum in unique(k)
+        append!(myl, Ref([k..., mynum]))
+    end
+end
+myl
+function makeoptions()
+    return [
+    [u1,u1,u1,u1,u1,u1,u1,u1,u1],
+    [u1,u1,u3,u1,u1,u1,u1,u1,u1],
+    [u1,u1,u1,u1,u1,d3,u1,u1,u1],
+    [u1,u1,u1,u1,u1,u1,u1,u1,l3],
+    [u1,u1,u3,u1,u1,u3,u1,u1,u1],
+    [u1,u1,u3,u1,u1,u1,u1,u1,u3],
+    [u1,u1,u1,u1,u1,d3,u1,u1,d3],
+    [u1,u1,u3,u1,u1,u3,u1,u1,u3],
+
+    ]
+end
+
+myus = [
+    [u1,u1,u1],
+    [u1,u1,u3],
+    [u1,u2,u3]
 ]
+mymultis = [1,3,1]
+
+function myds(us, multi)
+    ds = [
+        [d1,d1,d1],
+        [d1,d1,d3],
+        [d1,d2,d3]
+    ]
+    if length(unique(us)) == 1
+        m = [1,3,3,3]
+        append!(ds, [us[1],us[1],us[1]])
+        append!(ds, [us[1], us[1], d3])
+        append!(ds, [us[1], d2, d3])
+        append!(ds, [us[1], d2, d2])
+    elseif length(unique(us)) == 2
+        m = vcat([1,3,3,3],[1,3,3,3],[1,3,3])
+        for u in unique(us)
+            append!(ds, [u,u,u])
+            append!(ds, [u, u, d3])
+            append!(ds, [u, d2, d3])
+            append!(ds, [u, d2, d2])
+        end
+        append!(ds, [unique(us)[1], unique(us)[2], d3])
+        append!(ds, [unique(us)[1], unique(us)[2], unique(us)[2]])
+        append!(ds, [unique(us)[1], unique(us)[1], unique(us)[2]])
+
+    end
+    multis = multi .* vcat([1,3,1], m)
+
+    return ds
+end
+
+=#
 
 function generate_unique_models()
     us = _makeuniqueoptions(u1,u2,u3)
@@ -362,7 +466,68 @@ function generate_unique_models()
     return _vecvec(model_list[:,2:end]'), multi_list
 end
 
+#=
+function generate_typeviolating_models()
+    collect(with_replacement_combinations([u1,u2,u3, d1, d2, d3, l1, l2, l3],9))
+end
 
+
+a = generate_typeviolating_models()
+my2 = a[length.(unique.(a)) .== 2]
+
+collect(with_replacement_combinations([u1,u2, u3], 3))
+my2[132][1] == u1
+numarr = [u1,u2,u3,d1,d2,d3,l1,l2,l3]
+
+powarr = [numarr[1:i] for i in 1:length(numarr)]
+
+powarr[2]
+collect(powerset(powarr, 9,9))
+
+if Symbol(u1) in Symbol.(numarr)
+    println("tt")
+end
+
+for (i, mod) in enumerate(my2[172:end])
+    println(mod)
+    for (j,par) in enumerate(numarr)
+        println(mod[j])
+        if Symbol(mod[j]) ∉ Symbol.(numarr[1:j])
+            my2[i] = substitute(mod, Dict(mod[j] => par))
+        else
+            nothing
+        end
+    end
+    break
+end
+
+my2 = clean_models(my2)
+
+unique(my2)
+function clean_models(my2)
+    for i in 1:length(my2)
+        replaced = []
+        println("\n")
+        for j in 1:9
+            println(Symbol(my2[i][j]), "\t", Symbol.(replaced))
+            if Symbol(my2[i][j]) ∉ Symbol.(replaced)
+                my2[i] = substitute(my2[i], Dict(my2[i][j] => numarr[j]))
+                append!(replaced, numarr[j])
+                println(my2[i])
+            else
+                nothing
+            end
+        end
+    end
+    return my2
+end
+
+
+
+unique(my2)
+
+my2[13][1]
+=#
 function I_static(::Val{N}, ::Type{T}) where {N,T<:Real}
     convert(SMatrix{N,N,T}, Diagonal(SVector(ntuple(i -> one(T), Val(N)))))
 end
@@ -385,7 +550,7 @@ function parallel_randeqn_solve_proc!(
 
     idxarr, bnc = make_idx_bnc(N)
 
-    @threads for i in eachindex(proc_rs)
+    Threads.@threads for i in eachindex(proc_rs)
         @inbounds begin
             # When using drawer need to allocate indices. Is there a way around?
             idxs_i =  myidxtup!(idxarr, bnc, rand(1:tot), Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
@@ -404,7 +569,7 @@ function parallel_alleqn_solve_proc!(
 
     idxarr, bnc = make_idx_bnc(N)
 
-    @threads for i in eachindex(proc_rs)
+    Threads.@threads for i in eachindex(proc_rs)
         @inbounds begin
             # When using drawer need to allocate indices. Is there a way around?
             idxs_i =  myidxtup!(idxarr, bnc, i, Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
@@ -424,7 +589,7 @@ function parallel_alleqn_solve_proc_fullsol!(
 
     idxarr, bnc = make_idx_bnc(N)
 
-    @threads for i in eachindex(proc_rs)
+    Threads.@threads for i in eachindex(proc_rs)
         @inbounds begin
             # When using drawer need to allocate indices. Is there a way around?
             idxs_i =  myidxtup!(idxarr, bnc, i, Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
