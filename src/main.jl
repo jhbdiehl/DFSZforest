@@ -80,6 +80,15 @@ function runDFSZ(dataset;sample_n_gt=6, sample_log_nr_mods=9, ns =:all, compute_
                     parallel_alleqn_solve_proc_fullsol!(proc_rs, EoN_rs, rs_ws, as, bs, multis, tot, myEoN)
                     save_full(model, proc_rs, EoN_rs, rs_ws, 1; folder=dataset*"/n"*string(nH)*"/", bilin=bilin, valp1=valp1, valp2=valp2, ms=ms[k])
                 end
+            elseif length(un) > sample_n_gt && full_solution == true
+                chunk = 10^(sample_log_nr_mods)
+                @time begin
+                    proc_rs = similar(as, chunk)
+                    EoN_rs = similar(bs, chunk)
+                    rs_ws = similar(multis, length(proc_rs))
+                    parallel_randeqn_solve_proc_fullsol!(proc_rs, EoN_rs, rs_ws, as, bs, multis, tot, myEoN)
+                    save_full(model, proc_rs, EoN_rs, rs_ws, 1; folder=dataset*"/n"*string(nH)*"/", bilin=bilin, valp1=valp1, valp2=valp2, ms=ms[k])
+                end
             else
                 chunk = 10^(sample_log_nr_mods - 1)
                 m=10
@@ -100,7 +109,7 @@ function runDFSZ(dataset;sample_n_gt=6, sample_log_nr_mods=9, ns =:all, compute_
 end
 
 
-@time runDFSZ("220616-nbilin_fullsol"; sample_n_gt=6, sample_log_nr_mods=9, ns=[3,4,5], exactly_one_bilinear=false, compute_equivalent_theories=true, full_solution=true)
+@time runDFSZ("220616-nbilin_fullsol"; sample_n_gt=5, sample_log_nr_mods=6, ns=[6,7,8,9], exactly_one_bilinear=false, compute_equivalent_theories=true, full_solution=true)
 
 #fid = h5open("./data/DFSZ_models/220607-fullsolutionsv1/n6/full_n6.h5")
 #cc = read(fid["3n6_u1_u2_u3_d1_d1_d2_l1_l1_l1"]["bl=u1-u2"]["N"])

@@ -16,7 +16,7 @@ include("ksvz.jl")
 #fname=model2string(model)
 #lab = fname[1:11]*"\n    "*fname[12:20]*"\n    "*fname[21:end]
 
-dataset="220609-nbilinears"
+dataset="220615-nbilinears"
 
 function all_data(dataset; ns=:all, do_plot=nothing)
     if ns == :all
@@ -77,7 +77,7 @@ function all_data(dataset; ns=:all, do_plot=nothing)
     return ARhs, gaghs
 end
 
-Arhs, gaghs = all_data(dataset; ns=[3], do_plot=:full)
+Arhs, gaghs = all_data(dataset; ns=:all, do_plot=nothing)
 
 function plot_AR(myAR, dataset, folder; ec="maroon", lw=2, alpha=1.0)
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -183,7 +183,7 @@ KSVZcdf = cdf(KSVZ_ARs)
 KSVZcdf[5153]
 KSVZ_ARs.edges[1][5153]
 
-ARhs, gaghs = all_data("220530-mediumrun")
+ARhs, gaghs = all_data("220615-nbilinears")
 @time gagcdfs = cdf.(gaghs)
 @time ARcdfs = cdf.(ARhs)
 
@@ -218,22 +218,23 @@ c2a = 0.4
 
 #=
 # Plot all n=4 models in one histogram
-myAR = normalize(ARhs[7]; mode=:probability)
+k=4
+myAR = ARhs[2]#normalize(ARhs[k-2]; mode=:probability)
 fig, ax = plt.subplots(figsize=(6, 4))
 ax.stairs(myAR.weights, myAR.edges[1], ec=c2, lw=2, alpha=c2a)
 plt.xlim([5/3-20,5/3+20])
 plt.yscale("log")
-plt.ylim([1e-5,1])
+plt.ylim([1e0,5e3])
 plt.xlabel("Anomaly Ratio E/N")
-plt.ylabel("Probability")
-plt.title(L"All DFSZ-like $n_H = 9$ models")
+plt.ylabel("Number of models")
+plt.title(L"All DFSZ-like $n_H = $"*string(k)*" models")
 plt.axvline(5/3, ls=":", color="grey")
 plt.axvline(2/3, ls=":", color="k")
 plt.axvline(8/3, ls=":", color="k")
-#plt.text(4,1000, "symmetry axis 5/3", color="grey")
-#plt.text(-5,2000, "DFSZ-II", color="k")
-#plt.text(4,2000, "DFSZ-I", color="k")
-plt.savefig("plots/220530-mediumrun/PDFn9tot.pdf")
+plt.text(4,1000, "symmetry axis 5/3", color="grey")
+plt.text(-5,2000, "DFSZ-II", color="k")
+plt.text(4,2000, "DFSZ-I", color="k")
+plt.savefig("plots/220615-nbilinears/PDFn"*string(k)*"tot.pdf")
 #################################################
 =#
 
@@ -241,7 +242,7 @@ plt.savefig("plots/220530-mediumrun/PDFn9tot.pdf")
 # Plot all n=4 models separately
 k = 4
 @info "$k"
-fold = "220530-mediumrun-addendum/n"*string(k)
+fold = "220615-nbilinears_addendum/n"*string(k)
 folders = readdir("./data/DFSZ_models/"*fold, join=true)
 
 ARtot_list = similar(folders, Any)
@@ -252,7 +253,7 @@ for (j, folder) in enumerate(folders)
     @time for (i, file) in enumerate(files)
         model = fname2model(file)
         bilin = fname2bilin(file)
-        ARh = read_AR(model; folder="220530-mediumrun-addendum/n"*string(k), bilin=bilin, m=m)
+        ARh = read_AR(model; folder="220615-nbilinears_addendum/n"*string(k), bilin=bilin, m=m)
         #ARh = normalize(ARh; mode=:probability)
         hist1_list[i] = ARh
     end
@@ -260,6 +261,7 @@ for (j, folder) in enumerate(folders)
     ARtot.weights .*= parse(Int,string(m))
     ARtot_list[j] = ARtot
 end
+
 
 slist= ["up", "charm", "top", "down", "strange", "bottom", "electron", "muon", "tau"]
 a = collect(with_replacement_combinations(1:3, 2))
@@ -280,7 +282,7 @@ for h in ARtot_list[end:-1:1]
     i += 1
 end
 plt.suptitle(L"DFSZ-like $n_H = 4$ models, special coupling to...")
-plt.savefig("plots/220530-mediumrun/PDFn4all.pdf")
+plt.savefig("plots/220615-nbilinears/PDFn4all.pdf")
 #################################################
 =#
 
@@ -299,7 +301,7 @@ plt.xlim([-16.5,-12])
 plt.legend(loc="best")
 plt.xlabel("Anomaly Ratio E/N")
 plt.ylabel("Probability")
-plt.savefig("plots/220530-mediumrun/CDFcompare.pdf")
+plt.savefig("plots/220615-nbilinears/CDFcompare.pdf")
 #################################################
 =#
 
@@ -318,7 +320,7 @@ plt.ylim([1e-5,3e-1])
 plt.xlabel("Anomaly Ratio E/N")
 plt.ylabel("Probability")
 plt.legend(loc="best")
-plt.savefig("plots/220530-mediumrun/PDFcompare.pdf")
+plt.savefig("plots/220615-nbilinears/PDFcompare.pdf")
 #################################################
 =#
 
@@ -337,6 +339,137 @@ plt.ylim([1e-5,3e-1])
 plt.xlabel("Anomaly Ratio E/N")
 plt.ylabel("Probability")
 plt.legend(loc="lower center")
-plt.savefig("plots/220530-mediumrun/PDFcompareZoom.pdf")
+plt.savefig("plots/220615-nbilinears/PDFcompareZoom.pdf")
 #################################################
+=#
+
+
+
+
+
+
+
+#=
+using HDF5
+
+
+
+=
+fid
+
+fold = fid["3n4_u1_u1_u1_d1_d2_d2_l1_l1_l1"]
+println(fold)
+cclist = Array{Float64}(undef, 0, 10)
+EoNlist = []
+for bil in fold
+    cc = read(bil["Chis"])
+    cclist = vcat(cclist, cc)
+    EoN = read(bil["EoN"])
+    append!(EoNlist, EoN)
+end
+
+myEoNu = EoNlist[unique(i -> cclist[i,:], 1:size(cclist)[1])]
+
+unique(i -> cclist[i,:], 1:size(cclist)[1])
+unique(i -> round.(cclist[i,:],digits=4), 1:size(cclist)[1])
+
+using StatsPlots
+histogram(EoNlistd[-1e10 .< EoNlistd .< 1e10].-5/3,bins=-20:0.1:20)
+histogram(-EoNlistu[-1e10 .< EoNlistu .< 1e10].+5/3,bins=-20:0.1:20)
+
+myEoNlistu = []
+for ccs in eachrow(cclistu)
+    append!(myEoNlistu, EoverN.(ccs[1:9]...))
+end
+myEoNlistu .≈ EoNlistu
+
+sortslices(cclistd, by=i->EoverN(i[1:9]...), dims=1)
+sortslices(cclistu, by=i->EoverN(i[1:9]...), dims=1)
+
+sort(fEoNlistd, by=i->abs(i))
+
+cclistd[unique(i -> round.(cclistd[i,:], digits=4), 1:size(cclistd)[1]),:]
+cclistu[unique(i -> round.(cclistu[i,:], digits=4), 1:size(cclistu)[1]),:]
+sortslices(cclistu, dims=1)
+bcclistd = deepcopy(cclistd)
+bcclistd[:,1:3] = -cclistd[:,4:6]
+bcclistd[:,4:6] = -cclistd[:,1:3]
+sortslices(bcclistd, dims=1)
+fEoNlistd = EoNlistd[-1e10 .< EoNlistd .< 1e10]
+mybool = sort(EoNlistd[-1e10 .< EoNlistd .< 1e10].-5/3) .≈ sort(-EoNlistu[-1e10 .< EoNlistu .< 1e10].+5/3)
+sort(EoNlistd[-1e10 .< EoNlistd .< 1e10].-5/3)[mybool .== 0]
+cclist[unique(i -> cclist[i,:], 1:size(cclist)[1]), :]
+myEoNd
+myEoNu
+
+EoNlist
+
+myEoN = myEoN[-1e10 .< myEoN .< 1e10]
+append!(allEoN, myEoN)
+=#
+
+nlist=[4,5,6,7]
+nomgaghlist = similar(nlist, Any)
+for (i, n) in enumerate(nlist)
+    fid = h5open("./data/DFSZ_models/220616-nbilin_fullsol/n$n/full_n$n.h5")
+
+    allEoN = []
+    for fold in fid
+        if occursin("Chis order: u1u2u3d1d2d3l1l2l3s", string(fold))
+            nothing
+        else
+            @time begin
+                println(fold)
+                cclist = Array{Float64}(undef, 0, 10)
+                EoNlist = []
+                for bil in fold
+                    cc = read(bil["Chis"])
+                    cclist = vcat(cclist, cc)
+                    EoN = read(bil["EoN"])
+                    append!(EoNlist, EoN)
+                end
+                myEoN = EoNlist[unique(i -> round.(cclist[i,:],digits=4), 1:size(cclist)[1])]
+                myEoN = myEoN[-1e10 .< myEoN .< 1e10]
+                append!(allEoN, myEoN)
+            end
+        end
+    end
+
+    nomARh = fit(Histogram, allEoN, minimum(allEoN)-0.01:0.01:maximum(allEoN)+0.01)
+    gagh = gag_histogram(nomARh; mode=:probability, edges=-16.5:0.001:-12)
+    gagh = normalize(gagh; mode=:probability)
+    nomgaghlist[i] = gagh
+    plot_AR(nomARh, "220616-nbilin_fullsol", "ARs_nomulti_n$n")
+    close(fid)
+end
+nomgaghall = merge(nomgaghlist...)
+nomgaghall = merge(nomgaghlist[1:3]...)
+
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.stairs(ARhs[2].weights, ARhs[2].edges[1], linewidth=4000, lw=1.5, ec="mediumseagreen", alpha=1, label="all n=4 models")
+ax.stairs(nomARh4.weights, nomARh4.edges[1], linewidth=4000, lw=1.5, ec="maroon", alpha=1, label="different PQ charges")
+#ax.step(myAR.edges[1][2:end], myAR.weights)
+plt.xlim([5/3-20,5/3+20])
+plt.yscale("log")
+plt.ylim([1e0,4e3])
+plt.xlabel("Anomaly Ratio E/N")
+plt.ylabel("Number of models")
+plt.legend(loc="best")
+plt.savefig("plots/220616-nbilin_fullsol/PDFvsmulti4.pdf")
+
+
+
+nomgaghlist[3]
+gagcdf = cdf(nomgaghlist[3])
+
+
+fig, ax = plt.subplots(figsize=(6, 4))
+ax.step(KSVZgag.edges[1][2:end], cdf(KSVZgag); where="pre", lw=3, color=c1, label="KSVZ-like (all)")
+ax.step(nomgaghlist[3].edges[1][2:end], gagcdf; where="pre", lw=3, color=c2, alpha=0.4, label="DFSZ-like (all)")
+plt.xlim([-16.5,-12])
+plt.legend(loc="best")
+plt.xlabel("Anomaly Ratio E/N")
+plt.ylabel("Probability")
+plt.savefig("plots/220616-nbilin_fullsol/CDFcompare6.pdf")
+
 =#

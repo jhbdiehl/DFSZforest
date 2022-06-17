@@ -580,6 +580,26 @@ function parallel_alleqn_solve_proc!(
     end
 end
 
+function parallel_randeqn_solve_proc_fullsol!(
+    proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
+    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
+    tot::Int, myEoN
+) where N
+
+    idxarr, bnc = make_idx_bnc(N)
+
+    Threads.@threads for i in eachindex(proc_rs)
+        @inbounds begin
+            # When using drawer need to allocate indices. Is there a way around?
+            idxs_i =  myidxtup!(idxarr, bnc, rand(1:tot), Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
+            r = mysolve(as, bs, idxs_i)
+            proc_rs[i] = r
+
+            EoN_rs[i] = myEoN(r)
+            rs_ws[i] = prod(ws[idxs_i])
+        end
+    end
+end
 
 function parallel_alleqn_solve_proc_fullsol!(
     proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
@@ -601,6 +621,8 @@ function parallel_alleqn_solve_proc_fullsol!(
         end
     end
 end
+
+
 
 
 function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing, valp1=1, valp2=1, ms=NaN) where L
