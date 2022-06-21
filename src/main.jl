@@ -109,7 +109,7 @@ function runDFSZ(dataset;sample_n_gt=6, sample_log_nr_mods=9, ns =:all, compute_
 end
 
 
-@time runDFSZ("220616-nbilin_fullsol"; sample_n_gt=5, sample_log_nr_mods=6, ns=[6,7,8,9], exactly_one_bilinear=false, compute_equivalent_theories=true, full_solution=true)
+@time runDFSZ("test"; sample_n_gt=5, sample_log_nr_mods=7, ns=[5], exactly_one_bilinear=false, compute_equivalent_theories=true, full_solution=true)
 
 #fid = h5open("./data/DFSZ_models/220607-fullsolutionsv1/n6/full_n6.h5")
 #cc = read(fid["3n6_u1_u2_u3_d1_d1_d2_l1_l1_l1"]["bl=u1-u2"]["N"])

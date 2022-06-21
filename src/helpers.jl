@@ -633,7 +633,6 @@ function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::
         error("i has to be equal to 1. Incremental save not yet supported")
     end
     
-    ms=3
     fname = model2string(model)
     bilinname = bilin2string(bilin)
     good_idxs = findall(!isnan, EoN_rs)

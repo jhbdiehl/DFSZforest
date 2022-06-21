@@ -4,6 +4,7 @@ using LaTeXStrings#, Plots
 using FileIO
 using LinearAlgebra
 using Combinatorics
+using HDF5
 
 import PyPlot
 const plt = PyPlot
@@ -15,69 +16,6 @@ include("ksvz.jl")
 #model = fname2model(readdir("./data/DFSZ_models/preliminary2/n3")[1])
 #fname=model2string(model)
 #lab = fname[1:11]*"\n    "*fname[12:20]*"\n    "*fname[21:end]
-
-dataset="220615-nbilinears"
-
-function all_data(dataset; ns=:all, do_plot=nothing)
-    if ns == :all
-        ns = collect(3:9)
-    else
-        ns = ns
-    end
-
-    gaghs = similar(ns, Any)
-    ARhs = similar(ns, Any)
-    @time for (k,n) in enumerate(ns)
-        @info "$n"
-        savefolder = "./plots/"*dataset*"/ARs/n"*string(n)
-        mkpath(savefolder)
-        folders = readdir("./data/DFSZ_models/"*dataset*"/n"*string(n); join=true)
-        
-        ARtot_list = similar(folders, Any)
-        gagtot_list = similar(folders, Any)
-        for (j, folder) in enumerate(folders)
-            m = fname2m(folder)
-            files = readdir(folder)
-            hist1_list = similar(files, Any)
-            hist2_list = similar(files, Any)
-            @time for (i, file) in enumerate(files)
-                model = fname2model(file)
-                bilin = fname2bilin(file)
-                ARh = read_AR(model; folder=dataset*"/n"*string(n), bilin=bilin, m=m)
-                #ARh = normalize(ARh; mode=:probability)
-                gagh = gag_histogram(ARh; mode=:probability, edges=-16.5:0.001:-12)
-                gagh = normalize(gagh; mode=:probability)
-                #gagh = gag_histogram(tt; mode=:probability)
-                hist1_list[i] = ARh
-                hist2_list[i] = gagh
-                if do_plot == :bilinear
-                    plot_AR(ARh, dataset, "ARs/n$n/"*split(file, ".")[1])
-                end
-            end
-            ARtot = merge(hist1_list...)
-            gagtot = merge(hist2_list...)
-            gagtot = normalize(gagtot; mode=:probability)
-            gagtot.weights .*= parse(Int,string(m))
-            ARtot.weights .*= parse(Int,string(m))
-            ARtot_list[j] = ARtot
-            gagtot_list[j] = gagtot
-            if do_plot == :yukawamodel
-                plot_AR(ARtot, dataset, "ARs/n$n/"*split(folder,"/")[end])
-            end
-        end
-        ARall = merge(ARtot_list...)
-        gagall = merge(gagtot_list...)
-        gagall = normalize(gagall; mode=:probability)
-        gaghs[k] = gagall
-        ARhs[k] = ARall
-        if do_plot == :full
-            plot_AR(ARall, dataset, "ARs/n$n/n$n"*"_fullAR")
-        end
-    end
-    return ARhs, gaghs
-end
-
-Arhs, gaghs = all_data(dataset; ns=:all, do_plot=nothing)
 
 function plot_AR(myAR, dataset, folder; ec="maroon", lw=2, alpha=1.0)
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -96,81 +34,64 @@ function plot_AR(myAR, dataset, folder; ec="maroon", lw=2, alpha=1.0)
     #plt.text(4,2000, "DFSZ-I", color="k")
     plt.savefig("plots/"*dataset*"/"*folder*".pdf")
 end
-.
 
-#=
-function all_data(dataset;merge=true)
-    gaghs = similar(3:9, Any)
-    ARhs = similar(3:9, Any)
-    for k in 3:9
-        @info "$k"
-        fold = dataset*"/n"*string(k)
-        folders = readdir("./data/DFSZ_models/"*fold)
+function read_data(dataset; ns=collect(3:9), do_plot=nothing)
+
+    gaghs = similar(ns, Any)
+    ARhs = similar(ns, Any)
+    @time for (k,n) in enumerate(ns)
+        @info "$n"
+        savefolder = "./plots/"*dataset*"/ARs/n"*string(n)
+        mkpath(savefolder)
+        folders = readdir("./data/DFSZ_models/"*dataset*"/n"*string(n); join=true)
+        folders = folders[occursin.(".h5",folders) .== 0] # Throw away output of full_solution=true
+        
         ARtot_list = similar(folders, Any)
         gagtot_list = similar(folders, Any)
         for (j, folder) in enumerate(folders)
-            files = readdir("./data/DFSZ_models/"*fold*"/"*folder)
+            println(folder)
             m = fname2m(folder)
+            files = readdir(folder)
             hist1_list = similar(files, Any)
             hist2_list = similar(files, Any)
             @time for (i, file) in enumerate(files)
-                ARh, gagh = get_data(file; folder=fold, m=m)
+                model = fname2model(file)
+                bilin = fname2bilin(file)
+                ARh = read_AR(model; folder=dataset*"/n"*string(n), bilin=bilin, m=m)
+                #ARh = normalize(ARh; mode=:probability)
+                gagh = gag_histogram(ARh; mode=:probability, edges=-16.5:0.001:-12)
+                gagh = normalize(gagh; mode=:probability)
+                #gagh = gag_histogram(tt; mode=:probability)
                 hist1_list[i] = ARh
                 hist2_list[i] = gagh
+                if do_plot == :bilinear || do_plot == :all
+                    plot_AR(ARh, dataset, "ARs/n$n/"*split(file, ".")[1])
+                end
             end
-            ARtot = hist1_list[1] #merge(hist1_list...)
-            gagtot = hist2_list[1] #merge(hist2_list...)
-            #tttot = normalize(tttot; mode=:probability)
-            #tttot.weights .*= parse(Int,string(m))
+            ARtot = merge(hist1_list...)
+            gagtot = merge(hist2_list...)
+            gagtot = normalize(gagtot; mode=:probability)
+            gagtot.weights .*= parse(Int,string(m))
+            ARtot.weights .*= parse(Int,string(m))
             ARtot_list[j] = ARtot
             gagtot_list[j] = gagtot
+            if do_plot == :yukawamodel || do_plot == :all
+                plot_AR(ARtot, dataset, "ARs/n$n/"*split(folder,"/")[end])
+            end
         end
-
-        ARhs[k-2] = merge(ARtot_list...)
-        gaghs[k-2] = merge(gagtot_list...)
+        ARall = merge(ARtot_list...)
+        gagall = merge(gagtot_list...)
+        gagall = normalize(gagall; mode=:probability)
+        gaghs[k] = gagall
+        ARhs[k] = ARall
+        if do_plot == :full || do_plot == :all
+            plot_AR(ARall, dataset, "ARs/n$n/n$n"*"_fullAR")
+        end
     end
     return ARhs, gaghs
 end
 
-function get_data(file; folder="/preliminary2/n"*string(4)*"/", m=m)
-    model = fname2model(file)
-    bilin = fname2bilin(file)
-    ARh = read_AR(model; folder=folder, m=m, bilin=bilin)
-    #ARh = normalize(ARh; mode=:probability)
-    gagh = gag_histogram(ARh; mode=:probability, edges=-16.5:0.001:-12)
-    gagh = normalize(gagh; mode=:probability)
-    #ARh.weights .*= parse(Int,string(m))
-    #gagh.weights .*= parse(Int,string(m))
-    return ARh, gagh
-end
-=#
-#=
-function init_cdf()
-    p1 = plot(label="", title="DFSZ axion model CDF", 
-        xlabel=L"g_{a\gamma\gamma} \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability for bigger gaγγ",
-        bottom_margin=2Plots.mm, legend=:topright,
-        size=(400,300), lw=2)
-    return p1
-end
-
-function plot_cdf!(H, xH; kwargs...)
-    p1 = plot!(xH.edges[1][1:end-1], H; label="", lw=2, kwargs...)
-    return p1
-end
-
-function init_pdf()
-    p1 = plot(lt=:stepbins, label="", title="DFSZ axion model PDF", 
-        xlabel=L"ga\gamma\gamma \;\; [\log\;\mathrm{GeV}^{-1}]", ylabel="Probability",
-        bottom_margin=2Plots.mm, legend=:topright,
-        size=(400,300), lw=2)
-    return p1
-end
-
-function plot_pdf!(H; kwargs...)
-    p1 = plot!(H; lt=:stepbins, lw=1, label="", kwargs...)
-    return p1
-end
-=#
+Arhs, gaghs = read_data("test"; ns=[5], do_plot=nothing)
 
 function limit(frac, H)
     H.edges[1][1:end-1][cdf(H) .> frac][end]
@@ -183,7 +104,7 @@ KSVZcdf = cdf(KSVZ_ARs)
 KSVZcdf[5153]
 KSVZ_ARs.edges[1][5153]
 
-ARhs, gaghs = all_data("220615-nbilinears")
+ARhs, gaghs = read_data("220615-nbilinears")
 @time gagcdfs = cdf.(gaghs)
 @time ARcdfs = cdf.(ARhs)
 
@@ -299,7 +220,7 @@ ax.step(KSVZgag.edges[1][2:end], KSVZcdf; where="pre", lw=3, color=c1, label="KS
 ax.step(mygag.edges[1][2:end], gagcdf; where="pre", lw=3, color=c2, alpha=0.4, label="DFSZ-like (all)")
 plt.xlim([-16.5,-12])
 plt.legend(loc="best")
-plt.xlabel("Anomaly Ratio E/N")
+plt.xlabel(L"\log{g_{a \gamma}[\mathrm{GeV}^{-1}]}\: \: \mathrm{at}\: \: m_a = 40\; \mu\mathrm{eV}")
 plt.ylabel("Probability")
 plt.savefig("plots/220615-nbilinears/CDFcompare.pdf")
 #################################################
@@ -407,41 +328,65 @@ EoNlist
 myEoN = myEoN[-1e10 .< myEoN .< 1e10]
 append!(allEoN, myEoN)
 =#
+fid = h5open("./data/DFSZ_models/test/n5/full_n5.h5")
+for fold in fid
+    println(split(split(string(fold), "/")[2], " ")[1])
+end
+close(fid)
+nlist=[5]
 
-nlist=[4,5,6,7]
-nomgaghlist = similar(nlist, Any)
-for (i, n) in enumerate(nlist)
-    fid = h5open("./data/DFSZ_models/220616-nbilin_fullsol/n$n/full_n$n.h5")
+function read_full_data(dataset; ns=collect(3:9), do_plot=nothing)
+    gaghs = similar(ns, Any)
+    Arhs = similar(ns, Any)
+    for (i, n) in enumerate(ns)
+        fid = h5open("./data/DFSZ_models/"*dataset*"/n$n/full_n$n.h5")
+        savefolder = "./plots/"*dataset*"/AR_nomulti/n$n"
+        mkpath(savefolder)
 
-    allEoN = []
-    for fold in fid
-        if occursin("Chis order: u1u2u3d1d2d3l1l2l3s", string(fold))
-            nothing
-        else
-            @time begin
-                println(fold)
-                cclist = Array{Float64}(undef, 0, 10)
-                EoNlist = []
-                for bil in fold
-                    cc = read(bil["Chis"])
-                    cclist = vcat(cclist, cc)
-                    EoN = read(bil["EoN"])
-                    append!(EoNlist, EoN)
+        allEoN = []
+        allweights = Real[]
+        for fold in fid
+            if occursin("Chis order: u1u2u3d1d2d3l1l2l3s", string(fold))
+                nothing
+            else
+                @time begin
+                    println(fold)
+                    cclist = Array{Float64}(undef, 0, 10)
+                    EoNlist = []
+                    for bil in fold
+                        cc = read(bil["Chis"])
+                        cclist = vcat(cclist, cc)
+                        EoN = read(bil["EoN"])
+                        append!(EoNlist, EoN)
+                    end
+                    mult = parse(Int64,split(split(string(fold),"/")[2],"n")[1])
+                    myEoN = EoNlist[unique(i -> round.(cclist[i,:],digits=4), 1:size(cclist)[1])]
+                    myEoN = myEoN[-1e10 .< myEoN .< 1e10] 
+                    if do_plot == :all || do_plot == :yukawamodel
+                        ARhyuk = fit(Histogram, myEoN, FrequencyWeights(mult .* ones(size(myEoN))), -50:0.01:50)
+                        plot_AR(ARhyuk, dataset, "AR_nomulti/n$n/"*split(split(string(fold), "/")[2], " ")[1])
+                    end
+                    append!(allEoN, myEoN)
+                    append!(allweights, mult .* ones(size(myEoN)))
                 end
-                myEoN = EoNlist[unique(i -> round.(cclist[i,:],digits=4), 1:size(cclist)[1])]
-                myEoN = myEoN[-1e10 .< myEoN .< 1e10]
-                append!(allEoN, myEoN)
             end
         end
-    end
 
-    nomARh = fit(Histogram, allEoN, minimum(allEoN)-0.01:0.01:maximum(allEoN)+0.01)
-    gagh = gag_histogram(nomARh; mode=:probability, edges=-16.5:0.001:-12)
-    gagh = normalize(gagh; mode=:probability)
-    nomgaghlist[i] = gagh
-    plot_AR(nomARh, "220616-nbilin_fullsol", "ARs_nomulti_n$n")
-    close(fid)
+        ARh = fit(Histogram, allEoN, FrequencyWeights(allweights), -50:0.01:50)
+        Arhs[i] = ARh
+        gagh = gag_histogram(ARh; mode=:probability, edges=-16.5:0.001:-12)
+        gagh = normalize(gagh; mode=:probability)
+        gaghs[i] = gagh
+        if do_plot == :all || do_plot == :full
+            plot_AR(ARh, dataset, "AR_nomulti/n$n")
+        end
+        close(fid)
+    end
+    return Arhs, gaghs
 end
+
+noMarhs, noMgaghs = read_full_data("test", ns=[5], do_plot=:all)
+
 nomgaghall = merge(nomgaghlist...)
 nomgaghall = merge(nomgaghlist[1:3]...)
 
@@ -459,17 +404,17 @@ plt.savefig("plots/220616-nbilin_fullsol/PDFvsmulti4.pdf")
 
 
 
-nomgaghlist[3]
-gagcdf = cdf(nomgaghlist[3])
+nomgaghlist[1]
+gagcdf = cdf(nomgaghlist[1])
 
 
 fig, ax = plt.subplots(figsize=(6, 4))
 ax.step(KSVZgag.edges[1][2:end], cdf(KSVZgag); where="pre", lw=3, color=c1, label="KSVZ-like (all)")
-ax.step(nomgaghlist[3].edges[1][2:end], gagcdf; where="pre", lw=3, color=c2, alpha=0.4, label="DFSZ-like (all)")
+ax.step(nomgaghlist[1].edges[1][2:end], gagcdf; where="pre", lw=3, color=c2, alpha=0.4, label="DFSZ-like (n=5)")
 plt.xlim([-16.5,-12])
 plt.legend(loc="best")
-plt.xlabel("Anomaly Ratio E/N")
+plt.xlabel(L"\log{g_{a \gamma}[\mathrm{GeV}^{-1}]}\: \: \mathrm{at}\: \: m_a = 40 \; \mu\mathrm{eV}")
 plt.ylabel("Probability")
-plt.savefig("plots/220616-nbilin_fullsol/CDFcompare6.pdf")
+plt.savefig("plots/220616-nbilin_fullsol/CDFcompare5.pdf")
 
 =#
