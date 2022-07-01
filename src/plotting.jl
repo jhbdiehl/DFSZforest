@@ -385,7 +385,7 @@ function read_full_data(dataset; ns=collect(3:9), do_plot=nothing)
     return Arhs, gaghs
 end
 
-noMarhs, noMgaghs = read_full_data("test", ns=[5], do_plot=:all)
+noMarhs, noMgaghs = read_full_data("test", ns=[5], do_plot=nothing)
 
 nomgaghall = merge(nomgaghlist...)
 nomgaghall = merge(nomgaghlist[1:3]...)
@@ -418,3 +418,365 @@ plt.ylabel("Probability")
 plt.savefig("plots/220616-nbilin_fullsol/CDFcompare5.pdf")
 
 =#
+
+
+function my_read_full_data(dataset; ns=collect(3:9), do_plot=nothing)
+    gaghs = similar(ns, Any)
+    Arhs = similar(ns, Any)
+    for (i, n) in enumerate(ns)
+        fid = h5open("./data/DFSZ_models/"*dataset*"/n$n/full_n$n.h5")
+        savefolder = "./plots/"*dataset*"/AR_nomulti/n$n"
+        mkpath(savefolder)
+
+        allEoN = []
+        allweights = Real[]
+        for fold in fid
+            if occursin("Chis order: u1u2u3d1d2d3l1l2l3s", string(fold))
+                nothing
+            else
+                @time begin
+                    println(fold)
+                    cclist = Array{Float64}(undef, 0, 10)
+                    EoNlist = []
+                    for bil in fold
+                        cc = read(bil["Chis"])
+                        cclist = vcat(cclist, cc)
+                        EoN = read(bil["EoN"])
+                        append!(EoNlist, EoN)
+                    end
+                    mult = parse(Int64,split(split(string(fold),"/")[2],"n")[1])
+                    myEoN = EoNlist[unique(i -> round.(cclist[i,:],digits=4), 1:size(cclist)[1])]
+                    myEoN = myEoN[-1e10 .< myEoN .< 1e10] 
+                    println(length(myEoN))
+                    if do_plot == :all || do_plot == :yukawamodel
+                        ARhyuk = fit(Histogram, myEoN, FrequencyWeights(mult .* ones(size(myEoN))), -50:0.01:50)
+                        plot_AR(ARhyuk, dataset, "AR_nomulti/n$n/"*split(split(string(fold), "/")[2], " ")[1])
+                    end
+                    append!(allEoN, myEoN)
+                    append!(allweights, mult .* ones(size(myEoN)))
+                end
+            end
+        end
+
+        ARh = fit(Histogram, allEoN, FrequencyWeights(allweights), -50:0.01:50)
+        Arhs[i] = ARh
+        gagh = gag_histogram(ARh; mode=:probability, edges=-16.5:0.001:-12)
+        gagh = normalize(gagh; mode=:probability)
+        gaghs[i] = gagh
+        if do_plot == :all || do_plot == :full
+            plot_AR(ARh, dataset, "AR_nomulti/n$n")
+        end
+        close(fid)
+    end
+    return Arhs, gaghs
+end
+
+ARh5, gagh5 = my_read_full_data("test", ns=[5])
+
+
+fid = h5open("./data/DFSZ_models/220616-nbilin_fullsol/n5/full_n5.h5");
+for fold in fid
+    if occursin("Chis order: u1u2u3d1d2d3l1l2l3s", string(fold))
+        nothing
+    else
+        for bil in fold
+            println(bil)
+        end
+    end
+end
+close(fid)
+EoNlists = Array{Any}(undef, length(fid)-1)
+cclists = Array{Any}(undef, length(fid)-1)
+
+#=
+io = open("./data/DFSZ_models/test/foremi.txt", "w")
+
+write(io, "# yukawa \t bilinear \t maxEoN \t corresponding charges (u1u2u3d1d2d3l1l2l3s) \t minEoN \t corresponding charges (u1u2u3d1d2d3l1l2l3s) \n")
+
+
+for (i, fold) in enumerate(fid)
+    if occursin("Chis order: u1u2u3d1d2d3l1l2l3s", string(fold))
+        nothing
+    else
+        @time begin
+            for bil in fold
+                println(bil)
+                cc = read(bil["Chis"])
+                EoN = read(bil["EoN"])
+                k = -1e10 .< EoN .< 1e10
+                EoN = EoN[k]
+                cc = cc[k,:]
+                println(cc[1:5,:])
+                maxEoN = round(maximum(EoN); digits=2)
+                minEoN = round(minimum(EoN); digits=2)
+                mincc = cc[findall(EoN .== minimum(EoN)),:]
+                maxcc = cc[findall(EoN .== maximum(EoN)),:]
+                f = split(split(string(fold),"/")[2], " ")[1]
+                b = split(split(string(bil),"/")[3], " ")[1]
+                write(io, "$f \t $b \t $maxEoN \t $maxcc \t $minEoN \t $mincc \n")
+                println()
+                println(size(cc))
+            end
+        end
+    end
+end
+
+close(io)
+=#
+
+fid = h5open("./data/DFSZ_models/test/n4/full_n4.h5");
+EoNlists = Array{Any}(undef, length(fid)-1)
+cclists = Array{Any}(undef, length(fid)-1)
+for (i, fold) in enumerate(fid)
+    if occursin("Chis order: u1u2u3d1d2d3l1l2l3s", string(fold))
+        nothing
+    else
+        @time begin
+            println(fold)
+            cclist = Array{Float64}(undef, 0, 10)
+            EoNlist = []
+            for bil in fold
+                println(bil)
+                cc = read(bil["Chis"])
+                cclist = vcat(cclist, cc)
+                EoN = read(bil["EoN"])
+                append!(EoNlist, EoN)
+            end
+            mult = parse(Int64,split(split(string(fold),"/")[2],"n")[1])
+            myEoN = EoNlist[unique(i -> round.(cclist[i,:],digits=4), 1:size(cclist)[1])]
+            myEoN = myEoN[-1e10 .< myEoN .< 1e10] 
+            EoNlists[i] = EoNlist
+            println(size(cclist))
+            cclists[i] = cclist
+            println(length(EoNlist))
+        end
+    end
+end
+close(fid)
+EoNlists[1][ -1e10 .< EoNlists[1] .< 1e10]
+EoNlists2[1][ -1e10 .< EoNlists2[1] .< 1e10]
+
+histogram(EoNlists[1])
+histogram(EoNlists2[1])
+
+cclists[3]
+
+rslists = Array{Any}(undef, 10-1)
+EoNlists2 = Array{Any}(undef, 10-1)
+aslists = Array{Any}(undef, 10-1)
+bslists = Array{Any}(undef, 10-1)
+quadlists = Array{Any}(undef, 10-1)
+chislists = Array{Any}(undef, 10-1)
+a, ms = generate_all_models()
+mya = a[length.(unique.(a)) .∈ Ref([4])]
+#mya = [[u2, u1, u1, d1, d1, d1, l1, l1, l1],  [u1, u2, u2, d1, d1, d1, l1, l1, l1]]
+odd = (1,1)
+even = (1,-1)
+
+@time for (k, model) in enumerate(mya) #a[length.(unique.(a)) .== 8]
+    bilins = unique(sort.(collect(combinations(model,2)), by=x->Symbol(x)))
+    bilins = bilins[length.(unique.(bilins)) .== 2]
+    tott = 0
+    EoNlist = []
+    rslist= []
+    quadlist=[]
+    aslist=[]
+    bslist=[]
+    cclist = Array{Float64}(undef, 0, 10)
+    println(model)
+    for (i, bilin) in enumerate(bilins)
+        for (odd, even) in [((1,1),(1,-1)), ((-1,-1),(-1,1))]
+            if i <10
+                println(bilin)
+                valp1, valp2 = bilinvals(bilin; odd=odd, even=even)
+                un = unique(model)
+                nH = length(un)
+                quads, multis = get_quads(model; p1=bilin[1], p2=bilin[2], valp1=valp1, valp2=valp2)
+                append!(quadlist, quads)
+                if length(un) >= 7
+                    bi = bilinsum.(bilins[i+1:end]; odd=odd, even=even)
+                    bi1 = bilinsum.(bilins[i+1:end]; odd=odd, even=even)
+                    bi2 = bilinsum.(bilins[i+1:end]; odd=-1 .* odd, even=-1 .*even)
+                else # If you sample all bilins with equal nr of samples, excluding models you already calculated would lead to bias effect!
+                    bi = bilinsum.(bilins[1:end .!= i]; odd=odd, even=even)
+                    bi1 = bilinsum.(bilins[1:end .!= i]; odd=odd, even=even)
+                    bi2 = bilinsum.(bilins[1:end .!= i]; odd=-1 .* odd, even=-1 .*even)
+                end
+                #println(bi)
+                #terms = vcat(quads,bi)
+                terms = vcat(quads,bi1,bi2)
+                multis = vcat(multis, 1 * ones(Int64, size(vcat(bi1,bi2))...))
+                
+                as, bs = get_numquads(terms, un, nH; p1=bilin[1], p2=bilin[2], valp1=valp1, valp2=valp2)
+                append!(aslist, as)
+                append!(bslist, bs)
+                tot = binomial(length(terms),nH-2)
+                tott += tot
+                myEoN = get_EoNfunc(model; p1=bilin[1], p2=bilin[2], valp1=valp1, valp2=valp2)
+                proc_rs = similar(as, tot)
+                EoN_rs = similar(bs, tot)
+                rs_ws = similar(multis, length(proc_rs))
+                parallel_alleqn_solve_proc_fullsol!(proc_rs, EoN_rs, rs_ws, as, bs, multis, tot, myEoN)
+                #save_full(model, proc_rs, EoN_rs, rs_ws, 1; folder="test/n"*string(nH)*"/", bilin=bilin, valp1=valp1, valp2=valp2, ms=ms[k])
+                good_idxs = findall(!isnan, EoN_rs)
+                EoN_rs = EoN_rs[good_idxs]
+                good_proc_rs = proc_rs[good_idxs,:]
+                chi_s = ( abs(valp1) + abs(valp2) ) / 2
+                mydict = Dict{Num, Float64}(un .=> 0)
+                mydict[bilin[1]]= valp1
+                mydict[bilin[2]]= valp2
+                notp1p2 = isequal.(un,bilin[1]) .+ isequal.(un,bilin[2]) .== false
+
+                Chis = Matrix{Float64}(undef, length(EoN_rs), 10)
+                for i in 1:length(rs_ws[good_idxs])
+                    for (j, higgs) in enumerate(un[notp1p2])
+                        mydict[higgs] = good_proc_rs[i][j]
+                    end
+                    chivec = Symbolics.value.(substitute.(model, (mydict,)))
+                    append!(chivec, chi_s)
+                    Chis[i,:] .= chivec #Construct matrix with chi values, last one is charge of the singlet (always 1)
+                end
+                append!(EoNlist, EoN_rs)
+                append!(rslist, good_proc_rs)
+                cclist = vcat(cclist, Chis)
+            else
+                nothing
+            end
+        end
+    end
+    EoNlists2[k] = EoNlist
+    rslists[k] = rslist
+    quadlists[k] = quadlist
+    aslists[k] = aslist
+    bslists[k] = bslist
+    chislists[k] = cclist
+end
+
+for (odd, even) in [((1,1),(1,-1)), ((-1,-1),(-1,1))]
+    println(odd,even)
+end
+model = [u1,u1,u2,d1,d1,d1,l1,l1,l1]
+bilins = unique(sort.(collect(combinations(model,2)), by=x->Symbol(x)))
+bilins = bilins[length.(unique.(bilins)) .== 2]
+b1 = bilinsum.(bilins; odd=(1,1), even=(1,-1))
+b2 = bilinsum.(bilins; odd=(-1,-1), even=(-1,1))
+vcat(b1, b2)
+
+fid = h5open("./data/DFSZ_models/test/n4/full_n4.h5");
+EoNlists = Array{Any}(undef, length(fid)-1)
+cclists = Array{Any}(undef, length(fid)-1)
+for (i, fold) in enumerate(fid)
+    if occursin("Chis order: u1u2u3d1d2d3l1l2l3s", string(fold))
+        nothing
+    else
+        @time begin
+            println(fold)
+            cclist = Array{Float64}(undef, 0, 10)
+            EoNlist = []
+            for bil in fold
+                println(bil)
+                cc = read(bil["Chis"])
+                cclist = vcat(cclist, cc)
+                EoN = read(bil["EoN"])
+                append!(EoNlist, EoN)
+            end
+            mult = parse(Int64,split(split(string(fold),"/")[2],"n")[1])
+            #myEoN = EoNlist[unique(i -> round.(cclist[i,:],digits=4), 1:size(cclist)[1])]
+            #myEoN = myEoN[-1e10 .< myEoN .< 1e10] 
+            EoNlists[i] = EoNlist
+            println(size(cclist))
+            cclists[i] = cclist
+            println(length(EoNlist))
+        end
+    end
+end
+close(fid)
+
+tt = Num[u2 + (2//1)*d1 - l1, (2//1)*l1 + (2//1)*u2, l1 + 2u1 - u2, u2 + 2l1 - d1, 2d1 + 2u1, 2l1 - (2//1)*d1, d1 + l1 + u1 + u2, d1 + 2u2 - u1, l1 + 2u2 - u1, l1 + u2 - d1 - u1, (2//1)*l1 + (2//1)*u1, d1 + l1 + 2u1, u1 + u2 + 2l1, d1 + l1 + 2u2, d1 + 2u1 - u2, l1 + u1 - d1 - u2, (2//1)*d1 + (2//1)*u2, u1 + 2l1 - d1, u1 + u2 + 2d1, u1 + (2//1)*d1 - l1, 2u1, 2u1, 2u2, 2u2, l1 - d1]
+
+
+
+cpEoNlists2 = deepcopy(EoNlists2)
+cprslists = deepcopy(rslists)
+cpaslists = deepcopy(aslists)
+cpbslists = deepcopy(bslists)
+cpquadlists = deepcopy(quadlists)
+cpchislists = deepcopy(chislists)
+
+isequal(cpquadlists[1],quadlists[1])
+aslists[1] == cpaslists[1]
+bslists[1] == cpbslists[1]
+bslist
+cpbslists
+
+roundrs1 = [round.(el, digits=4) for el in rslists[1]]
+cproundrs1 = [round.(el, digits=4) for el in cprslists[1]]
+roundrs3 = [round.(el, digits=4) for el in rslists[3]]
+countmap(roundrs1) == countmap(cproundrs1)
+
+c1 = chislists[1]
+c2 = cpchislists[1]
+c3 = chislists[3]
+sum(c1[:,3] .== 1 .&& c1[:,1] .== -1)
+countmap(c1[:,1])# == countmap(c1[:,3])
+mergewith( (x,y) -> abs(x-y), countmap(c1[:,1]), countmap(c1[:,3]))
+
+c1[-1e10 .< EoNlists2[1] .< 1e10,:]
+eon1 = round.(EoNlists2[1][-1e10 .< EoNlists2[1] .< 1e10], digits=4)
+eon2 = round.(cpEoNlists2[1][-1e10 .< cpEoNlists2[1] .< 1e10], digits=4)
+eon3 = round.(EoNlists2[3][-1e10 .< EoNlists2[3] .< 1e10], digits=4)
+countmap(eon3)# == 
+countmap(eon1)
+eon1 .== eon2
+sum(values(mergewith( (x,y) -> abs(x-y), countmap(eon1), countmap(eon3))))
+countmap(eon1)
+
+EoNlisttmp = EoNlists[end:-1:1]
+EoNlists = EoNlisttmp
+a = EoNlists2[1][-1e10 .< EoNlists2[1] .< 1e10]
+b = EoNlists2[3][-1e10 .< EoNlists2[3] .< 1e10]
+
+a1 = countmap(round.(a, digits=4))
+b1 = countmap(round.(b, digits=4))
+
+mergewith( (x,y) -> abs(x-y), a1, b1)
+
+
+a = [[1,1] [2,3]]
+#diff.([1,2], [3,2])
+isequal(a,b)
+issetequal(a,b)
+
+using StatsBase
+
+cclists[1][round.(EoNlists2[1], digits=4) .== 0.4167,:]
+countmap(round.(EoNlists[1][-1e10 .< EoNlists[1] .< 1e10], digits=4))
+sum(round.(EoNlists[1], digits=4) .== 0.4167)
+sum(isequal.(rslists[1],Ref(rslists[1][ind][3])))
+
+ind = findall(x -> round.(x,digits=4) .== 0.4167, EoNlists[1])
+findall(x -> isequal.(x, Ref(rslists[1][ind][3])), rslists[1])
+cclists[1]
+rslists[1][round.(EoNlists[1],digits=4) .== 0.4167]
+rslists[3][round.(EoNlists[1],digits=4) .== 0.4167]
+# Should be equal not only for 1,2 but also for 1,3!
+a = countmap(sort.(collect(eachrow(round.(quadlists[1][-1e10 .< quadlists[1] .< 1e10], digits=4)))))
+b = countmap(sort.(collect(eachrow(round.(quadlists[3][-1e10 .< quadlists[3] .< 1e10],digits=4)))))
+a
+a == b
+
+mergewith( (x,y) -> abs(x-y), a, b)
+
+cc1us = sortslices(cclists[1][:, 1:3], dims=1)
+cc1ds = sortslices(cclists[1][:, 4:6], dims=1)
+cc1ds[cc1ds .!= cc1us]
+sum(cclists[7])
+sortslices(cclists[2], dims=1)
+sortslices(cclists[3], dims=1)
+isequal(cclists[1], cclists[4])
+EoNlists
+issetequal(EoNlists[1], EoNlists[3])
+
+idxarr, bnc = make_NEW_idx_bnc(5)
+idxarr
+idxs_i =  myNEWidxtup!(idxarr, bnc, 12312, Val(5))
