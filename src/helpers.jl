@@ -39,7 +39,7 @@ function get_quads(model; old=false, p1=u1, p2=d1, valp1=1, valp2=1)
     fillones = (fillones .== 1) .* 2//1 .- 1//1 # weird hack to make sure the array contains only Ints, because unique() does not work with negative floats and symbols
     quads .*= fillones
     quads .*= (length.(string.(quads)) .<= 7) .+ 1//1 # weird way of multiplying all quads by 2 if they only contain two different higgs. This is so sum(abs(higgs)) == 4
-    if valp1 + valp2 == 2
+    if abs(valp1 + valp2) == 2
         quads = quads[isequal.(quads, 2//1 * p1 + 2//1 * p2) .!= 1//1] # effectively is not equal...
     elseif valp1 + valp2 == 0
         quads = quads[isequal.(quads, 2//1 * p1 - 2//1 * p2) .+ isequal.(quads, 2//1 * p2 - 2//1 * p1) .!= 1//1] # effectively is not equal...
@@ -159,8 +159,8 @@ function bilinvals(bilin; odd=(1, 1), even=(1, -1))
     end
 end
 
-function bilinsum(bilin)
-    v1, v2 = bilinvals(bilin)
+function bilinsum(bilin; odd=(2,0), even=(-1,1))
+    v1, v2 = bilinvals(bilin; odd=odd, even=even)
     return bilin[1] * v1 + bilin[2] * v2
 end
 
@@ -242,7 +242,8 @@ function get_numquads(quads, un, nH; p1=u1, p2 = d1, valp1=1, valp2=1)
     u1d1dict = Dict{Num, Int8}(un .=> 0)
     u1d1dict[p1] = valp1
     u1d1dict[p2] = valp2
-    bs = SVector{length(quads), Float64}(-1 .* Symbolics.value.(substitute.(quads, (u1d1dict,))) .+ (2 .* (length.(string.(quads)) .<= 7))) # i.e. set up les normally and add +2 or +0 depending on if its a bilinear or a quadrilinear
+    chi_s = 1
+    bs = SVector{length(quads), Float64}(-1 .* Symbolics.value.(substitute.(quads, (u1d1dict,))) .+ (2 .* chi_s .* (length.(string.(quads)) .<= 7))) # i.e. set up les normally and add +2 or +0 depending on if its a bilinear or a quadrilinear
 
     for i in 1:nH-2
         mydict = Dict(un .=> 0.0)
@@ -622,6 +623,27 @@ function parallel_alleqn_solve_proc_fullsol!(
     end
 end
 
+function parallel_alleqn_solve_NEW_proc_fullsol!(
+    proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
+    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
+    tot::Int, myEoN
+) where N
+
+    idxarr, bnc = make_NEW_idx_bnc(N)
+
+    Threads.@threads for i in eachindex(proc_rs)
+        @inbounds begin
+            # When using drawer need to allocate indices. Is there a way around?
+            idxs_i =  myNEWidxtup!(idxarr, bnc, i, Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
+            r = mysolve(as, bs, idxs_i)
+            proc_rs[i] = r
+
+            EoN_rs[i] = myEoN(r)
+            rs_ws[i] = prod(ws[idxs_i])
+        end
+    end
+end
+
 
 
 
@@ -683,4 +705,14 @@ function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::
     h5write(tpath*"full_n"*string(nH)*".h5", group*"/multis",good_rs_ws)
 
     @info "Done!"
+end
+
+function make_NEW_idx_bnc(N)
+    for (i,t) in enumerate(TupIter{N}())
+        i > 10_000 && break
+        @assert i == tupidx(t)
+    end
+    bnc = binom_cache(N, 1000);
+    idxarr = similar([1],N+1);
+    return idxarr, bnc
 end

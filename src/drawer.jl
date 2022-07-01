@@ -98,3 +98,18 @@ function myidxtup!(idxarr::Vector{<:Real}, bnc, idx::Int, ::Val{k}) where k
     idxarr[1] = idx
     SVector(ntuple(i -> idxarr[i], Val(k)))
 end
+
+function myNEWidxtup!(idxarr::Vector{<:Real}, bnc, idx::Int, ::Val{k}) where k
+    if k > 1
+        for j in k:-1:2
+            last = searchsortedlast(bnc[j], idx-1)
+            idx -= bnc[j][last]
+            idxarr[j+1] = last+1
+        end
+    else
+        nothing
+    end
+    idxarr[2] = idx
+    idxarr[1] = 0
+    SVector(ntuple(i -> idxarr[i] +1, Val(k+1)))
+end
