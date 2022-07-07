@@ -1,59 +1,6 @@
 """
-    Careful! This ignores different quadrilinears leading to the same condition! This is maybe not the behavior we want! (Not true anymore!)
-    (Also this function is incredibly dirty, holy cow!)
 """
-function get_quads(model; old=false, p1=u1, p2=d1, valp1=1, valp2=1)
-    vars = unique(model)
-    us = Num[]
-    for u in [u1, u2, u3]
-        if sum(isequal.(u, vars)) !== 0
-            append!(us, u)
-        else
-            nothing
-        end
-    end
-    
-    doublets = get_doublets(vars, us)
-    
-    if old == true
-        allquads = collect(powerset(doublets, 2,2)) # This does not take conditions like (ue) (ue) into account, that dont produce new E/N values but should be important for multiplicities!
-    else
-        allquads = collect(with_replacement_combinations(doublets, 2))
-    end
-    allquads = permutedims(hcat(allquads...))
-    allquads_conj = deepcopy(allquads)
-    allquads_conj[:,1] .*= -1//1
-    allquads = vcat(allquads, allquads_conj)
-    allquads = [sum(sum(allquads[i,:])) for i in 1:size(allquads)[1]]
-    ut = tril(permutedims(hcat([isequal.(allquads, -allquads[i]) for i in 1:length(allquads)]...)),-1) # make sure to remove duplicates like a = -b
-    fut = findall(ut)
-    for i in 1:length(fut)
-        allquads[fut[i][1]] = allquads[fut[i][2]]
-    end
-    #println(length(allquads))
-    #uniquads = unique(allquads, dims=1) # remove all duplicates
-    #println(length(uniquads))
-    quads = allquads
-    fillones = substitute(quads, Dict([var => 1//1 for var in vars]))
-    fillones = (sign.(fillones) .== 0) + sign.(fillones) # make sign return 1 if element = 0
-    fillones = (fillones .== 1) .* 2//1 .- 1//1 # weird hack to make sure the array contains only Ints, because unique() does not work with negative floats and symbols
-    quads .*= fillones
-    quads .*= (length.(string.(quads)) .<= 7) .+ 1//1 # weird way of multiplying all quads by 2 if they only contain two different higgs. This is so sum(abs(higgs)) == 4
-    if abs(valp1 + valp2) == 2
-        quads = quads[isequal.(quads, 2//1 * p1 + 2//1 * p2) .!= 1//1] # effectively is not equal...
-    elseif valp1 + valp2 == 0
-        quads = quads[isequal.(quads, 2//1 * p1 - 2//1 * p2) .+ isequal.(quads, 2//1 * p2 - 2//1 * p1) .!= 1//1] # effectively is not equal...
-    else
-        error("I think your bilinear values for the bilinear you used explicitly are not good!")
-    end
-    #quads .*= 2//1 # now all quads are multiplied by two. This ensures type stability and does not affect the endresult!
-    #return quads, [1 for i in 1:length(quads)]
-    quads = quads[isequal.(quads, 0) .== 0] # remove quads that dont give sensible conditions
-    quads = countmap(quads)
-    return collect(keys(quads)), collect(values(quads))
-end
-
-function get_quads_NEW(model)
+function get_quads(model)
     vars = unique(model)
     us = Num[]
     for u in [u1, u2, u3]
@@ -115,13 +62,6 @@ function orthogonality(model)
     sum(un .* (-1).^o)
 end
 
-function clean_countmap!(cmap)
-    if any(collect(keys(cmap)) .=== -0.0) && any(collect(keys(cmap)) .=== 0.0)
-        cmap[0.0] += cmap[-0.0]
-        cmap[-0.0] = 0
-    end
-    return cmap
-end
 
 """
     Calculate Anomaly Ratio, given PQ charges of up- and down quarks as well as leptons.
@@ -130,9 +70,15 @@ function EoverN(u1, u2, u3, d1, d2, d3, l1, l2, l3)
     2/3 + 2 * (u1 + u2 + u3 + l1 + l2 + l3) / (u1 + u2 + u3 + d1 + d2 + d3)
 end
 
-function checks(AR::Vector)
-    sum(typeof.(AnomalyRatio) .== Rational{Int64}) == length(AnomalyRatio) ? nothing : error(
-    "Your final AnomalyRatio array has not been calculated fully analytically, at least one element does not have type Rational{Int64}.")
+function N(u1,u2,u3,d1,d2,d3,l1,l2,l3)
+    1/2 * (u1 + u2 + u3 + d1 + d2 + d3)
+end
+
+function get_Nfunc(model)
+    un = unique(model)
+    tN = N(model...)
+    myNtmp = build_function(tN, un)
+    myN = eval(myNtmp)
 end
 
 """
@@ -209,6 +155,17 @@ function string2num(varlist)
     return symargs
 end
 
+function clean_countmap!(cmap)
+    if any(collect(keys(cmap)) .=== -0.0) && any(collect(keys(cmap)) .=== 0.0)
+        cmap[0.0] += cmap[-0.0]
+        cmap[-0.0] = 0
+    end
+    return cmap
+end
+
+_vecvec(mat) = [mat[i,:] for i in 1:size(mat,1)]
+_vecvecvec(mat) = [[mat[j,:,i] for i in 1:size(mat,3)] for j in 1:size(mat,1)]
+
 function bilinvals(bilin; odd=(1, 1), even=(1, -1))
     bstring = bilin2string(bilin)
     NrOfUs = length(findall( x -> x == 'u', bstring))
@@ -255,17 +212,7 @@ function save_AR(model, proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<
     @info "Done!"
 end
 
-function get_EoNfunc(model; p1=u1, p2=d1, valp1=1, valp2=1)
-    un = unique(model)
-    nH = length(un)
-    notu1d1 = isequal.(un,p1) .+ isequal.(un,p2) .== false
-    EoN = EoverN(model...)
-    EoN = substitute(EoN, Dict(p1=>valp1,p2=>valp2))
-    myEoNtmp = build_function(EoN, un[notu1d1])
-    myEoN = eval(myEoNtmp)
-end
-
-function get_EoNfunc_NEW(model)
+function get_EoNfunc(model)
     un = unique(model)
     EoN = EoverN(model...)
     myEoNtmp = build_function(EoN, un)
@@ -291,6 +238,21 @@ function checks(tot, nsamps, un)
     return nsamps
 end
 
+function check_symmetry(EoNlists; wslists=[ones(size(EoNlist)) for EoNlist in EoNlists])
+    EoN = [round.(EoNlist, digits=6) for EoNlist in EoNlists]
+    ws = Int.(vcat(wslists...))
+    EoN = vcat(EoN...)
+    cEoN = countmap(EoN, ws)
+    clean_countmap!(cEoN)
+    sEoN = Dict(round.(-1 .* keys(cEoN) .+ 3.33333333, digits=4) .=> values(cEoN))
+    EoN = [round.(EoNlist, digits=4) for EoNlist in EoNlists]
+    EoN = vcat(EoN...)
+    cEoN = countmap(EoN, ws)
+    clean_countmap!(cEoN)
+    mEoN = mergewith( (x,y) -> x-y, cEoN, sEoN)
+    sum(abs.(values(mEoN))) == 0
+end
+
 
 function read_AR(model; folder="", bilin=nothing, m=NaN)
     fname = model2string(model)
@@ -299,30 +261,8 @@ function read_AR(model; folder="", bilin=nothing, m=NaN)
     return FileIO.load("./data/DFSZ_models/"*folder*"/"*m*fname*"/"*fname*bilinname*".jld2", "ARs")
 end
 
-_vecvec(mat) = [mat[i,:] for i in 1:size(mat,1)]
-_vecvecvec(mat) = [[mat[j,:,i] for i in 1:size(mat,3)] for j in 1:size(mat,1)]
 
-
-function get_numquads(quads, un, nH; p1=u1, p2 = d1, valp1=1, valp2=1)
-    notu1d1 = isequal.(un,p1) .+ isequal.(un,p2) .== false
-    numquads = zeros(Int8,length(quads), nH-2)
-
-    u1d1dict = Dict{Num, Int8}(un .=> 0)
-    u1d1dict[p1] = valp1
-    u1d1dict[p2] = valp2
-    chi_s = 1
-    bs = SVector{length(quads), Float64}(-1 .* Symbolics.value.(substitute.(quads, (u1d1dict,))) .+ (2 .* chi_s .* (length.(string.(quads)) .<= 7))) # i.e. set up les normally and add +2 or +0 depending on if its a bilinear or a quadrilinear
-
-    for i in 1:nH-2
-        mydict = Dict(un .=> 0.0)
-        mydict[un[notu1d1][i]] = 1.0
-        numquads[:,i] = Symbolics.value.(substitute.(quads, (mydict,)))
-    end
-    as = Vector{SVector{nH-2, Float64}}(_vecvec(numquads))
-    return as, bs
-end
-
-function get_numquads_NEW(quads, un, nH)
+function get_numquads(quads, un, nH)
     numquads = zeros(Int8,length(quads), nH)
 
     for i in 1:nH
@@ -442,6 +382,26 @@ function _makeuniqueoptions(a,b,c; us=nothing, ds=nothing)
     end
 end
 
+function generate_unique_models()
+    us = _makeuniqueoptions(u1,u2,u3)
+    ds = _makeuniqueoptions(d1,d2,d3)
+    ls = _makeuniqueoptions(l1,l2,l3)
+
+    #tmp_models = collect(Iterators.product(us, ds, ls));
+    m = [1,3,1]
+    multis = collect(Iterators.product(m,m,m))
+    #println(tmp_models)
+    #length(tmp_models)
+    model_list = [u1 for i in 1:9]#similar([1 for i in 1:length(tmp_models)], Any)
+    multi_list = []
+    for (i, tmp) in enumerate(collect(Iterators.product(us, ds, ls)))
+        mult = *(multis[i]...)
+        append!(multi_list, mult)
+        model_list = hcat(model_list, [tmp[1]...,tmp[2]...,tmp[3]...])
+    end
+    return _vecvec(model_list[:,2:end]'), multi_list
+end
+
 #=
 opt = _makeuniqueoptions(u1,u2,u3)
 
@@ -527,29 +487,6 @@ function myds(us, multi)
     return ds
 end
 
-=#
-
-function generate_unique_models()
-    us = _makeuniqueoptions(u1,u2,u3)
-    ds = _makeuniqueoptions(d1,d2,d3)
-    ls = _makeuniqueoptions(l1,l2,l3)
-
-    #tmp_models = collect(Iterators.product(us, ds, ls));
-    m = [1,3,1]
-    multis = collect(Iterators.product(m,m,m))
-    #println(tmp_models)
-    #length(tmp_models)
-    model_list = [u1 for i in 1:9]#similar([1 for i in 1:length(tmp_models)], Any)
-    multi_list = []
-    for (i, tmp) in enumerate(collect(Iterators.product(us, ds, ls)))
-        mult = *(multis[i]...)
-        append!(multi_list, mult)
-        model_list = hcat(model_list, [tmp[1]...,tmp[2]...,tmp[3]...])
-    end
-    return _vecvec(model_list[:,2:end]'), multi_list
-end
-
-#=
 function generate_typeviolating_models()
     collect(with_replacement_combinations([u1,u2,u3, d1, d2, d3, l1, l2, l3],9))
 end
@@ -621,7 +558,7 @@ function make_idx_bnc(N)
         @assert i == tupidx(t)
     end
     bnc = binom_cache(N, 1000);
-    idxarr = similar([1],N);
+    idxarr = similar([1],N+2);
     return idxarr, bnc
 end
 
@@ -631,14 +568,14 @@ function parallel_randeqn_solve_proc!(
     tot::Int, myEoN
 ) where N
 
-    idxarr, bnc = make_idx_bnc(N)
+    idxarr, bnc = make_idx_bnc(N-2)
 
     Threads.@threads for i in eachindex(proc_rs)
         @inbounds begin
             # When using drawer need to allocate indices. Is there a way around?
-            idxs_i =  myidxtup!(idxarr, bnc, rand(1:tot), Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
+            idxs_i =  myidxtup!(idxarr, bnc, rand(1:tot), Val(N-2))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
             r = mysolve(as, bs, idxs_i)
-            proc_rs[i] = myEoN(r)
+            proc_rs[i] = ifelse(-0.00000001 .< myN(r) .< 0.00000001, NaN, myEoN(r))
             rs_ws[i] = prod(ws[idxs_i])
         end
     end
@@ -650,14 +587,14 @@ function parallel_alleqn_solve_proc!(
     tot::Int, myEoN
 ) where N
 
-    idxarr, bnc = make_idx_bnc(N)
+    idxarr, bnc = make_idx_bnc(N-2)
 
     Threads.@threads for i in eachindex(proc_rs)
         @inbounds begin
             # When using drawer need to allocate indices. Is there a way around?
-            idxs_i =  myidxtup!(idxarr, bnc, i, Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
+            idxs_i =  myidxtup!(idxarr, bnc, i, Val(N-2))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
             r = mysolve(as, bs, idxs_i)
-            proc_rs[i] = myEoN(r)
+            proc_rs[i] = ifelse(-0.00000001 .< myN(r) .< 0.00000001, NaN, myEoN(r))
             rs_ws[i] = prod(ws[idxs_i])
         end
     end
@@ -669,54 +606,12 @@ function parallel_randeqn_solve_proc_fullsol!(
     tot::Int, myEoN
 ) where N
 
-    idxarr, bnc = make_idx_bnc(N)
+    idxarr, bnc = make_idx_bnc(N-2)
 
     Threads.@threads for i in eachindex(proc_rs)
         @inbounds begin
             # When using drawer need to allocate indices. Is there a way around?
-            idxs_i =  myidxtup!(idxarr, bnc, rand(1:tot), Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
-            r = mysolve(as, bs, idxs_i)
-            proc_rs[i] = r
-
-            EoN_rs[i] = myEoN(r)
-            rs_ws[i] = prod(ws[idxs_i])
-        end
-    end
-end
-
-function parallel_alleqn_solve_proc_fullsol!(
-    proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
-    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
-    tot::Int, myEoN
-) where N
-
-    idxarr, bnc = make_idx_bnc(N)
-
-    Threads.@threads for i in eachindex(proc_rs)
-        @inbounds begin
-            # When using drawer need to allocate indices. Is there a way around?
-            idxs_i =  myidxtup!(idxarr, bnc, i, Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
-            r = mysolve(as, bs, idxs_i)
-            proc_rs[i] = r
-
-            EoN_rs[i] = myEoN(r)
-            rs_ws[i] = prod(ws[idxs_i])
-        end
-    end
-end
-
-function parallel_alleqn_solve_NEW_proc_fullsol!(
-    proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
-    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
-    tot::Int, myEoN, myN
-) where N
-
-    idxarr, bnc = make_NEW_idx_bnc(N-2)
-
-    Threads.@threads for i in eachindex(proc_rs)
-        @inbounds begin
-            # When using drawer need to allocate indices. Is there a way around?
-            idxs_i =  myNEWidxtup!(idxarr, bnc, i, Val(N-2))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
+            idxs_i =  myidxtup!(idxarr, bnc, rand(1:tot), Val(N-2))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
             r = mysolve(as, bs, idxs_i)
             proc_rs[i] = r
 
@@ -726,88 +621,30 @@ function parallel_alleqn_solve_NEW_proc_fullsol!(
     end
 end
 
-function N(u1,u2,u3,d1,d2,d3,l1,l2,l3)
-    1/2 * (u1 + u2 + u3 + d1 + d2 + d3)
-end
+function parallel_alleqn_solve_proc_fullsol!(
+    proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
+    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
+    tot::Int, myEoN, myN
+) where N
 
-function get_Nfunc(model)
-    un = unique(model)
-    tN = N(model...)
-    myNtmp = build_function(tN, un)
-    myN = eval(myNtmp)
-end
+    idxarr, bnc = make_idx_bnc(N-2)
 
-function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing, valp1=1, valp2=1, ms=NaN) where L
-    
-    @info "Saving..."
+    Threads.@threads for i in eachindex(proc_rs)
+        @inbounds begin
+            # When using drawer need to allocate indices. Is there a way around?
+            idxs_i =  myidxtup!(idxarr, bnc, i, Val(N-2))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
+            r = mysolve(as, bs, idxs_i)
+            proc_rs[i] = r
 
-    if i != 1
-        error("i has to be equal to 1. Incremental save not yet supported")
-    end
-    
-    fname = model2string(model)
-    bilinname = bilin2string(bilin)
-    good_idxs = findall(!isnan, EoN_rs)
-    good_EoN_rs = EoN_rs[good_idxs]
-    good_proc_rs = proc_rs[good_idxs,:]
-    good_rs_ws = rs_ws[good_idxs]
-
-    chi_s = ( abs(valp1) + abs(valp2) ) / 2
-    un = unique(model)
-    nH = length(un)
-
-    mydict = Dict{Num, Float64}(un .=> 0)
-    mydict[bilin[1]]= valp1
-    mydict[bilin[2]]= valp2
-
-    notp1p2 = isequal.(un,bilin[1]) .+ isequal.(un,bilin[2]) .== false
-
-    E = similar(good_EoN_rs)
-    N = similar(good_EoN_rs)
-    Chis = Matrix{Float64}(undef, length(good_EoN_rs), 10)
-    for i in 1:length(good_rs_ws)
-        for (j, higgs) in enumerate(un[notp1p2])
-            mydict[higgs] = good_proc_rs[i][j]
+            EoN_rs[i] = ifelse(-0.00000001 .< myN(r) .< 0.00000001, NaN, myEoN(r))
+            rs_ws[i] = prod(ws[idxs_i])
         end
-        chivec = Symbolics.value.(substitute.(model, (mydict,)))
-        E[i] = 4 * sum(chivec[1:3]) + 1 * sum(chivec[4:6]) + 3 * sum(chivec[7:9])
-        N[i] = 3/2 * sum(chivec[1:6])
-        append!(chivec, chi_s)
-        Chis[i,:] .= chivec #Construct matrix with chi values, last one is charge of the singlet (always 1)
     end
-
-    tpath = "./data/DFSZ_models/"*folder
-    if ms == NaN
-        group = fname*"/"*bilinname[2:end]
-    else
-        group = string(ms)*fname*"/"*bilinname[2:end]
-    end
-    
-    if isfile(tpath*"full_n"*string(nH)*".h5") == false
-        mkpath(tpath)
-        h5write(tpath*"full_n"*string(nH)*".h5", "Chis order: u1u2u3d1d2d3l1l2l3s", "")
-    end
-
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/Chis",Chis)
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/E",E)
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/N",N)
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/EoN",good_EoN_rs)
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/multis",good_rs_ws)
-
-    @info "Done!"
 end
 
-function make_NEW_idx_bnc(N)
-    for (i,t) in enumerate(TupIter{N}())
-        i > 10_000 && break
-        @assert i == tupidx(t)
-    end
-    bnc = binom_cache(N, 1000);
-    idxarr = similar([1],N+2);
-    return idxarr, bnc
-end
 
-function save_full_NEW(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing, ms=NaN) where L
+
+function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing, ms=NaN) where L
     
     @info "Saving..."
 
