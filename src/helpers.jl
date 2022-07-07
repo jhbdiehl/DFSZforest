@@ -110,8 +110,9 @@ function get_bilins(model)
 end
 
 function orthogonality(model)
-    o = in.(Symbol.(model),Ref(Symbol.([u1,u2,u3])))
-    sum(model .* (-1).^o)
+    un = unique(model)
+    o = in.(Symbol.(un),Ref(Symbol.([u1,u2,u3])))
+    sum(un .* (-1).^o)
 end
 
 
