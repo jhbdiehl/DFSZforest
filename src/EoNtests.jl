@@ -17,7 +17,7 @@ include("helpers.jl")
 n = 1000000
 models = rand(Uniform(-1.0,1.0), n, 9)
 models = rand(2*Poisson(2) - 3.5, n, 9)
-models = rand(-0:0.01:100, n, 9)
+models = rand(-10:1:10, n, 9)
 mean(vec(models))
 EoNs = Array{Float64}(undef, n)
 

@@ -53,16 +53,68 @@ function get_quads(model; old=false, p1=u1, p2=d1, valp1=1, valp2=1)
     return collect(keys(quads)), collect(values(quads))
 end
 
+function get_quads_NEW(model)
+    vars = unique(model)
+    us = Num[]
+    for u in [u1, u2, u3]
+        if sum(isequal.(u, vars)) !== 0
+            append!(us, u)
+        else
+            nothing
+        end
+    end
+    
+    doublets = get_doublets(vars, us)
+    
+    allquads = collect(with_replacement_combinations(doublets, 2))
+    allquads = permutedims(hcat(allquads...))
+    allquads_conj = deepcopy(allquads)
+    allquads_conj[:,1] .*= -1
+    allquads = vcat(allquads, allquads_conj)
+    allquads = [sum(sum(allquads[i,:])) for i in 1:size(allquads)[1]]
+    allquads .*= (length.(string.(allquads)) .<= 8) .+ 1 # weird way of multiplying all quads by 2 if they only contain two different higgs. This is so sum(abs(higgs)) == 4
+    ut = tril(permutedims(hcat([isequal.(allquads, -allquads[i]) for i in 1:length(allquads)]...)),-1) # make sure to remove duplicates like a = -b
+    fut = findall(ut)
+    for i in 1:length(fut)
+        allquads[fut[i][1]] = allquads[fut[i][2]]
+    end
+    
+    quads = allquads
+    fillones = substitute(quads, Dict([var => 1 for var in vars]))
+    fillones = (sign.(fillones) .== 0) + sign.(fillones) # make sign return 1 if element = 0
+    fillones = (fillones .== 1) .* 2 .- 1 # weird hack to make sure the array contains only Ints, because unique() does not work with negative floats and symbols
+    quads .*= fillones
+    quads = quads[isequal.(quads, 0) .== 0] # remove quads that dont give sensible conditions
+    quads = countmap(quads)
+    return collect(keys(quads)), collect(values(quads))
+end
+
 function get_doublets(vars, us)
     doublets = collect(powerset(vars, 2,2))
     diffs = [length(setdiff(doublets[i], us)) for i in 1:length(doublets)]
     sig = isodd.(diffs) .* 2 .- 1 # lifehack! Maps BitVector (0 for false, 1 for true) to (-1 for false and 1 for true)
     sig = hcat(sig, ones(size(sig)))
     doublets = permutedims(hcat(doublets...))
-    doublets .*= Int64.(sig).* 2//1 .* 1//2
+    doublets .*= Int64.(sig)#.* 2//1 .* 1//2
     doublets = [doublets[i,:] for i in 1:size(doublets, 1)]
     return doublets
 end
+
+function get_bilins(model)
+    vars=unique(model)
+    bilins = unique(sort.(collect(combinations(model,2)), by=x->Symbol(x)))
+    bilins = bilins[length.(unique.(bilins)) .== 2]
+    o = [iseven(sum(in.(Symbol.(bilin),Ref(Symbol.([u1,u2,u3]))))) for bilin in bilins]
+    bi = [bilins[i][1] .+ (-1).^o[i] .* bilins[i][2] for i in 1:length(bilins)]
+    vcat(bi, bi .* -1)
+end
+
+function orthogonality(model)
+    o = in.(Symbol.(model),Ref(Symbol.([u1,u2,u3])))
+    sum(model .* (-1).^o)
+end
+
+
 """
     Calculate Anomaly Ratio, given PQ charges of up- and down quarks as well as leptons.
 """
@@ -120,7 +172,7 @@ function bilin2string(bilin)
     if bilin === nothing
         return ""
     else
-        return "_bl="*string(bilin[1])*"-"*string(bilin[2])
+        return "_bl="*string(bilin)
     end
 end
 
@@ -205,6 +257,14 @@ function get_EoNfunc(model; p1=u1, p2=d1, valp1=1, valp2=1)
     myEoN = eval(myEoNtmp)
 end
 
+function get_EoNfunc_NEW(model)
+    un = unique(model)
+    EoN = EoverN(model...)
+    myEoNtmp = build_function(EoN, un)
+    myEoN = eval(myEoNtmp)
+end
+
+
 function checks(tot, nsamps, un)
     if typeof(nsamps) == Int
         if nsamps > tot
@@ -251,6 +311,20 @@ function get_numquads(quads, un, nH; p1=u1, p2 = d1, valp1=1, valp2=1)
         numquads[:,i] = Symbolics.value.(substitute.(quads, (mydict,)))
     end
     as = Vector{SVector{nH-2, Float64}}(_vecvec(numquads))
+    return as, bs
+end
+
+function get_numquads_NEW(quads, un, nH)
+    numquads = zeros(Int8,length(quads), nH)
+
+    for i in 1:nH
+        mydict = Dict(un .=> 0.0)
+        mydict[un[i]] = 1.0
+        numquads[:,i] = Symbolics.value.(substitute.(quads, (mydict,)))
+    end
+    chi_s = 1
+    as = Vector{SVector{nH, Float64}}(_vecvec(numquads))
+    bs = SVector{length(quads), Float64}(2 .* chi_s .* (length.(string.(quads)) .<= 8))
     return as, bs
 end
 
@@ -626,26 +700,34 @@ end
 function parallel_alleqn_solve_NEW_proc_fullsol!(
     proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
     as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
-    tot::Int, myEoN
+    tot::Int, myEoN, myN
 ) where N
 
-    idxarr, bnc = make_NEW_idx_bnc(N)
+    idxarr, bnc = make_NEW_idx_bnc(N-2)
 
     Threads.@threads for i in eachindex(proc_rs)
         @inbounds begin
             # When using drawer need to allocate indices. Is there a way around?
-            idxs_i =  myNEWidxtup!(idxarr, bnc, i, Val(N))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
+            idxs_i =  myNEWidxtup!(idxarr, bnc, i, Val(N-2))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
             r = mysolve(as, bs, idxs_i)
             proc_rs[i] = r
 
-            EoN_rs[i] = myEoN(r)
+            EoN_rs[i] = ifelse(-0.00000001 .< myN(r) .< 0.00000001, NaN, myEoN(r))
             rs_ws[i] = prod(ws[idxs_i])
         end
     end
 end
 
+function N(u1,u2,u3,d1,d2,d3,l1,l2,l3)
+    1/2 * (u1 + u2 + u3 + d1 + d2 + d3)
+end
 
-
+function get_Nfunc(model)
+    un = unique(model)
+    tN = N(model...)
+    myNtmp = build_function(tN, un)
+    myN = eval(myNtmp)
+end
 
 function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing, valp1=1, valp2=1, ms=NaN) where L
     
@@ -713,6 +795,62 @@ function make_NEW_idx_bnc(N)
         @assert i == tupidx(t)
     end
     bnc = binom_cache(N, 1000);
-    idxarr = similar([1],N+1);
+    idxarr = similar([1],N+2);
     return idxarr, bnc
+end
+
+function save_full_NEW(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing, ms=NaN) where L
+    
+    @info "Saving..."
+
+    if i != 1
+        error("i has to be equal to 1. Incremental save not yet supported")
+    end
+    
+    fname = model2string(model)
+    bilinname = bilin2string(bilin)
+    good_idxs = findall(!isnan, EoN_rs)
+    good_EoN_rs = EoN_rs[good_idxs]
+    good_proc_rs = proc_rs[good_idxs,:]
+    good_rs_ws = rs_ws[good_idxs]
+
+    chi_s = 1
+    un = unique(model)
+    nH = length(un)
+
+    mydict = Dict{Num, Float64}(un .=> 0)
+
+    E = similar(good_EoN_rs)
+    N = similar(good_EoN_rs)
+    Chis = Matrix{Float64}(undef, length(good_EoN_rs), 10)
+    for i in 1:length(good_rs_ws)
+        for (j, higgs) in enumerate(un)
+            mydict[higgs] = good_proc_rs[i][j]
+        end
+        chivec = Symbolics.value.(substitute.(model, (mydict,)))
+        E[i] = 4 * sum(chivec[1:3]) + 1 * sum(chivec[4:6]) + 3 * sum(chivec[7:9])
+        N[i] = 3/2 * sum(chivec[1:6])
+        append!(chivec, chi_s)
+        Chis[i,:] .= chivec #Construct matrix with chi values, last one is charge of the singlet (always 1)
+    end
+
+    tpath = "./data/DFSZ_models/"*folder
+    if ms == NaN
+        group = fname*"/"*bilinname[2:end]
+    else
+        group = string(ms)*fname*"/"*bilinname[2:end]
+    end
+    
+    if isfile(tpath*"full_n"*string(nH)*".h5") == false
+        mkpath(tpath)
+        h5write(tpath*"full_n"*string(nH)*".h5", "Chis order: u1u2u3d1d2d3l1l2l3s", "")
+    end
+
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/Chis",Chis)
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/E",E)
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/N",N)
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/EoN",good_EoN_rs)
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/multis",good_rs_ws)
+
+    @info "Done!"
 end
