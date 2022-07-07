@@ -27,7 +27,7 @@ include("./helpers.jl")
 """
 
 
-compute_equivalent_theories=false
+compute_equivalent_theories=true
 ns=[4]
 
 if compute_equivalent_theories
@@ -102,17 +102,39 @@ eon3 = round.(EoNlists[30][-1e10 .< EoNlists[30] .< 1e10], digits=6)
 histogram(eon3, bins=-10+5/3:0.01:10+5/3)
 
 
-EoN = [round.(EoNlist, digits=6) for EoNlist in EoNlists]
-ws = Int.(vcat(wslists...))
+EoN = [round.(EoNlist, digits=6) for EoNlist in EoNlists[7:9]]
+ws = Int.(vcat(wslists[7:9]...))
 EoN = vcat(EoN...)
 cEoN = countmap(EoN, ws)
+clean_countmap!(cEoN)
 sEoN = Dict(round.(-1 .* keys(cEoN) .+ 3.33333333, digits=4) .=> values(cEoN))
-EoN = [round.(EoNlist, digits=4) for EoNlist in EoNlists]
+EoN = [round.(EoNlist, digits=4) for EoNlist in EoNlists[7:9]]
 EoN = vcat(EoN...)
 cEoN = countmap(EoN, ws)
-mEoN = mergewith( (x,y) -> x-y, countmap(EoN), sEoN)
+clean_countmap!(cEoN)
+mEoN = mergewith( (x,y) -> x-y, cEoN, sEoN)
 [mEoN[x] for x in keys(mEoN) if abs(x) .== 0.0] #.-5/3
 sum(abs.(values(mEoN))) / 2
+
+function clean_countmap!(cmap)
+    if any(collect(keys(cmap)) .=== -0.0) && any(collect(keys(cmap)) .=== 0.0)
+        cmap[0.0] += cmap[-0.0]
+        delete!(cmap, -0.0)
+    end
+end
+
+EoN = [round.(EoNlist, digits=4) for EoNlist in EoNlists[1:6]]
+ws = Int.(vcat(wslists[1:6]...))
+EoN = vcat(EoN...)
+cEoN = countmap(EoN, ws)
+EoN2 = [round.(EoNlist, digits=6) for EoNlist in EoNlists[7]]
+ws2 = Int.(vcat(wslists[7]...))
+EoN2 = vcat(EoN2...)
+cEoN2 = countmap(EoN2, ws2)
+cEoN2 = Dict(round.(-1 .* keys(cEoN) .+ 3.33333333, digits=4) .=> values(cEoN))
+mEoN = mergewith( (x,y) -> x-y, cEoN, cEoN2)
+sum(abs.(values(mEoN)))
+[x for x in keys(cEoN) if -0.01 .<= x .<= 0.01] #.-5/3
 
 
 fulleon = vcat(EoNlists...)

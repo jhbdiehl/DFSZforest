@@ -115,6 +115,13 @@ function orthogonality(model)
     sum(un .* (-1).^o)
 end
 
+function clean_countmap!(cmap)
+    if any(collect(keys(cmap)) .=== -0.0) && any(collect(keys(cmap)) .=== 0.0)
+        cmap[0.0] += cmap[-0.0]
+        cmap[-0.0] = 0
+    end
+    return cmap
+end
 
 """
     Calculate Anomaly Ratio, given PQ charges of up- and down quarks as well as leptons.
