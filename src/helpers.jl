@@ -238,7 +238,7 @@ function checks(tot, nsamps, un)
     return nsamps
 end
 
-function check_symmetry(EoNlists; wslists=[ones(size(EoNlist)) for EoNlist in EoNlists])
+function check_symmetry(EoNlists::Array{Any}; wslists=[ones(size(EoNlist)) for EoNlist in EoNlists])
     EoN = [round.(EoNlist, digits=6) for EoNlist in EoNlists]
     ws = Int.(vcat(wslists...))
     EoN = vcat(EoN...)
@@ -250,7 +250,32 @@ function check_symmetry(EoNlists; wslists=[ones(size(EoNlist)) for EoNlist in Eo
     cEoN = countmap(EoN, ws)
     clean_countmap!(cEoN)
     mEoN = mergewith( (x,y) -> x-y, cEoN, sEoN)
-    sum(abs.(values(mEoN))) == 0
+    if sum(abs.(values(mEoN))) != 0
+        if sum(abs.(values(mEoN))) == abs(mEoN[0.0]) + abs(mEoN[-0.0])
+            return true
+        else
+            return mEoN
+        end
+    else
+        return true
+    end
+end
+
+function check_symmetry(cEoN::Dict{<:Real, <:Real})
+    clean_countmap!(cEoN)
+    sEoN = Dict(round.(-1.0 .* keys(cEoN) .+ 3.33333333, digits=4) .=> values(cEoN))
+    cEoN = Dict(round.(collect(keys(cEoN)), digits=4) .=> collect(values(cEoN)))
+    mEoN = mergewith( (x,y) -> x-y, cEoN, sEoN)
+    if sum(abs.(values(mEoN))) != 0
+        if sum(abs.(values(mEoN))) == abs(mEoN[0.0]) + abs(mEoN[-0.0])
+            return true
+        else
+            @warn "Your resulting EoN Histogram is not symmetric around 5/3. This means some (probably numerical) issue arose. Investigate!"
+            return mEoN
+        end
+    else
+        return true
+    end
 end
 
 
@@ -356,7 +381,7 @@ function generate_all_models()
         model_list = hcat(model_list, [tmp[1]...,tmp[2]...,tmp[3]...])
     end
     a = _vecvec(model_list[:,2:end]')
-    return a, ones(Int8, length(a))
+    return a, ones(Int64, length(a))
 end
 
 function _makeuniqueoptions(a,b,c; us=nothing, ds=nothing)
@@ -563,9 +588,9 @@ function make_idx_bnc(N)
 end
 
 function parallel_randeqn_solve_proc!(
-    proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
+    proc_rs::AbstractVector{<:SVector{N,<:Real}}, rs_ws::AbstractVector{<:Integer},
     as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
-    tot::Int, myEoN
+    tot::Int
 ) where N
 
     idxarr, bnc = make_idx_bnc(N-2)
@@ -575,16 +600,16 @@ function parallel_randeqn_solve_proc!(
             # When using drawer need to allocate indices. Is there a way around?
             idxs_i =  myidxtup!(idxarr, bnc, rand(1:tot), Val(N-2))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
             r = mysolve(as, bs, idxs_i)
-            proc_rs[i] = ifelse(-0.00000001 .< myN(r) .< 0.00000001, NaN, myEoN(r))
+            proc_rs[i] = round.(r, digits=10)
             rs_ws[i] = prod(ws[idxs_i])
         end
     end
 end
 
 function parallel_alleqn_solve_proc!(
-    proc_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
+    proc_rs::AbstractVector{<:SVector{N,<:Real}}, rs_ws::AbstractVector{<:Integer},
     as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
-    tot::Int, myEoN
+    tot::Int
 ) where N
 
     idxarr, bnc = make_idx_bnc(N-2)
@@ -594,7 +619,7 @@ function parallel_alleqn_solve_proc!(
             # When using drawer need to allocate indices. Is there a way around?
             idxs_i =  myidxtup!(idxarr, bnc, i, Val(N-2))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
             r = mysolve(as, bs, idxs_i)
-            proc_rs[i] = ifelse(-0.00000001 .< myN(r) .< 0.00000001, NaN, myEoN(r))
+            proc_rs[i] = round.(r, digits=10)
             rs_ws[i] = prod(ws[idxs_i])
         end
     end
@@ -602,8 +627,8 @@ end
 
 function parallel_randeqn_solve_proc_fullsol!(
     proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
-    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
-    tot::Int, myEoN
+    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer}, terms_all::AbstractVector{<:Num}, terms,
+    tot::Int, myEoN, myN
 ) where N
 
     idxarr, bnc = make_idx_bnc(N-2)
@@ -613,9 +638,10 @@ function parallel_randeqn_solve_proc_fullsol!(
             # When using drawer need to allocate indices. Is there a way around?
             idxs_i =  myidxtup!(idxarr, bnc, rand(1:tot), Val(N-2))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
             r = mysolve(as, bs, idxs_i)
-            proc_rs[i] = r
+            proc_rs[i] = round.(r, digits=10)
 
             EoN_rs[i] = ifelse(-0.00000001 .< myN(r) .< 0.00000001, NaN, myEoN(r))
+            terms[i] = Vector(terms_all[idxs_i])
             rs_ws[i] = prod(ws[idxs_i])
         end
     end
@@ -623,7 +649,7 @@ end
 
 function parallel_alleqn_solve_proc_fullsol!(
     proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
-    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer},
+    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer}, terms_all::AbstractVector{<:Num}, terms,
     tot::Int, myEoN, myN
 ) where N
 
@@ -634,17 +660,48 @@ function parallel_alleqn_solve_proc_fullsol!(
             # When using drawer need to allocate indices. Is there a way around?
             idxs_i =  myidxtup!(idxarr, bnc, i, Val(N-2))#rand_idxs(default_rng(), eachindex(as), Val(N)) # drawer(13131) #
             r = mysolve(as, bs, idxs_i)
-            proc_rs[i] = r
+            proc_rs[i] = round.(r, digits=10)
 
             EoN_rs[i] = ifelse(-0.00000001 .< myN(r) .< 0.00000001, NaN, myEoN(r))
+            #if 82 < EoN_rs[i] < 10000
+            #    println(EoN_rs[i])
+            #    println(idxs_i)
+            #end
+            terms[i] = Vector(terms_all[idxs_i])
             rs_ws[i] = prod(ws[idxs_i])
         end
     end
 end
 
 
+function save_EoN(model, EoN_countmap; folder="", new_file=false, filename="EoNs")
+    
+    @info "Saving..."
 
-function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, i::Int; folder="", bilin=nothing, ms=NaN) where L
+    
+    modstring = model2string(model)
+    un = unique(model)
+    nH = length(un)
+
+    tpath = "./data/DFSZ_models/"*folder
+    group = string(nH)*"/"*modstring
+    fname = tpath*"/"*filename*".jld2"
+    
+    if isfile(fname) == false || new_file
+        mkpath(tpath)
+        FileIO.save(fname, Dict(group => EoN_countmap))
+    else
+        jldopen(fname, "a+") do file
+            file[group] = EoN_countmap
+        end
+    end
+    
+
+    @info "Done!"
+end
+
+
+function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, myterms, i::Int; folder="", bilin=nothing, ms=NaN) where L
     
     @info "Saving..."
 
@@ -658,6 +715,7 @@ function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::
     good_EoN_rs = EoN_rs[good_idxs]
     good_proc_rs = proc_rs[good_idxs,:]
     good_rs_ws = rs_ws[good_idxs]
+    good_myterms = myterms[good_idxs,:]
 
     chi_s = 1
     un = unique(model)
@@ -679,12 +737,9 @@ function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::
         Chis[i,:] .= chivec #Construct matrix with chi values, last one is charge of the singlet (always 1)
     end
 
-    tpath = "./data/DFSZ_models/"*folder
-    if ms == NaN
-        group = fname*"/"*bilinname[2:end]
-    else
-        group = string(ms)*fname*"/"*bilinname[2:end]
-    end
+    
+    tpath = "./data/DFSZ_models/"*folder*"/"
+    group = fname*"/"*bilinname[2:end]
     
     if isfile(tpath*"full_n"*string(nH)*".h5") == false
         mkpath(tpath)
@@ -696,6 +751,18 @@ function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::
     h5write(tpath*"full_n"*string(nH)*".h5", group*"/N",N)
     h5write(tpath*"full_n"*string(nH)*".h5", group*"/EoN",good_EoN_rs)
     h5write(tpath*"full_n"*string(nH)*".h5", group*"/multis",good_rs_ws)
+    h5write(tpath*"full_n"*string(nH)*".h5", group*"/terms",good_myterms)
+    if ms !== NaN
+        h5write(tpath*"full_n"*string(nH)*".h5", group*"/ms",ms)
+    end
 
     @info "Done!"
+end
+
+function dict_value_shift!(d::Dict{Ti,Tv},shift::Tv) where Ti where Tv <: Signed
+    # In version v1.2+ this can use hasfield(Dict,:vals) instead
+    @assert isdefined(d,:vals) "If this fails implimentation of Dict has changed"
+    @inbounds for n in 1:length(d.vals)
+        d.vals[n] *= shift
+    end
 end
