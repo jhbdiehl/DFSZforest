@@ -90,11 +90,13 @@ function myidxtup!(idxarr::Vector{<:Real}, bnc, idx::Int, ::Val{k}) where k
         for j in k:-1:2
             last = searchsortedlast(bnc[j], idx-1)
             idx -= bnc[j][last]
-            idxarr[j] = last+1
+            idxarr[j+2] = last+1
         end
     else
         nothing
     end
-    idxarr[1] = idx
-    SVector(ntuple(i -> idxarr[i], Val(k)))
+    idxarr[3] = idx
+    idxarr[2] = 0
+    idxarr[1] = -1
+    SVector(ntuple(i -> idxarr[i] +2, Val(k+2)))
 end
