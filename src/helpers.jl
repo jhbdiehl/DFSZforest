@@ -702,7 +702,7 @@ function save_EoN(model, EoN_countmap; folder="", new_file=false, filename="EoNs
 end
 
 
-function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, myterms, i::Int; folder="", bilin=nothing, ms=NaN, model_multiplicity=NaN) where L
+function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, myterms, i::Int; folder="", bilin=nothing, ms=NaN, model_multiplicity=NaN, full=true) where L
     
     @info "Saving..."
 
@@ -741,24 +741,29 @@ function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::
     
     tpath = "./data/DFSZ_models/"*folder*"/"
     group = fname*"/"*bilinname[2:end]
-    
-    if isfile(tpath*"full_n"*string(nH)*".h5") == false
-        mkpath(tpath)
-        h5write(tpath*"full_n"*string(nH)*".h5", "Chis order: u1u2u3d1d2d3l1l2l3s", "")
+    if full
+        prefix = "full"
+    else
+        prefix= "samples"
     end
 
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/Chis",Chis)
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/E",E)
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/N",N)
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/EoN",good_EoN_rs)
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/multis",good_rs_ws)
-    h5write(tpath*"full_n"*string(nH)*".h5", group*"/terms",good_myterms)
+    if isfile(tpath*prefix*"_n"*string(nH)*".h5") == false
+        mkpath(tpath)
+        h5write(tpath*prefix*"_n"*string(nH)*".h5", "Chis order: u1u2u3d1d2d3l1l2l3s", "")
+    end
+
+    h5write(tpath*prefix*"_n"*string(nH)*".h5", group*"/Chis",Chis)
+    h5write(tpath*prefix*"_n"*string(nH)*".h5", group*"/E",E)
+    h5write(tpath*prefix*"_n"*string(nH)*".h5", group*"/N",N)
+    h5write(tpath*prefix*"_n"*string(nH)*".h5", group*"/EoN",good_EoN_rs)
+    h5write(tpath*prefix*"_n"*string(nH)*".h5", group*"/multis",good_rs_ws)
+    h5write(tpath*prefix*"_n"*string(nH)*".h5", group*"/terms",good_myterms)
     if ms !== NaN
-        h5write(tpath*"full_n"*string(nH)*".h5", group*"/ms",ms)
+        h5write(tpath*prefix*"_n"*string(nH)*".h5", group*"/ms",ms)
     end
 
     if model_multiplicity !== NaN
-        h5write(tpath*"full_n"*string(nH)*".h5", group*"/model_multiplicity",model_multiplicity)
+        h5write(tpath*prefix*"_n"*string(nH)*".h5", group*"/model_multiplicity",model_multiplicity)
     end
 
     @info "Done!"
