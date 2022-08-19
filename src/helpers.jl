@@ -649,7 +649,7 @@ end
 
 function parallel_alleqn_solve_proc_fullsol!(
     proc_rs::AbstractVector{<:SVector{N,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer},
-    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer}, terms_all::AbstractVector{<:Num}, terms,
+    as::AbstractVector{<:SVector{N,<:Real}}, bs::AbstractVector{<:Real}, ws::AbstractVector{<:Integer}, terms_all::AbstractVector{<:Num}, terms, sols,
     tot::Int, myEoN, myN
 ) where N
 
@@ -668,6 +668,7 @@ function parallel_alleqn_solve_proc_fullsol!(
             #    println(idxs_i)
             #end
             terms[i] = Vector(terms_all[idxs_i])
+            sols[i] = bs[idxs_i]
             rs_ws[i] = prod(ws[idxs_i])
         end
     end
@@ -701,7 +702,7 @@ function save_EoN(model, EoN_countmap; folder="", new_file=false, filename="EoNs
 end
 
 
-function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, myterms, i::Int; folder="", bilin=nothing, ms=NaN) where L
+function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::AbstractVector{<:Real}, rs_ws::AbstractVector{<:Integer}, myterms, i::Int; folder="", bilin=nothing, ms=NaN, model_multiplicity=NaN) where L
     
     @info "Saving..."
 
@@ -756,6 +757,10 @@ function save_full(model, proc_rs::AbstractVector{<:SVector{L,<:Real}}, EoN_rs::
         h5write(tpath*"full_n"*string(nH)*".h5", group*"/ms",ms)
     end
 
+    if model_multiplicity !== NaN
+        h5write(tpath*"full_n"*string(nH)*".h5", group*"/model_multiplicity",model_multiplicity)
+    end
+
     @info "Done!"
 end
 
@@ -765,4 +770,37 @@ function dict_value_shift!(d::Dict{Ti,Tv},shift::Tv) where Ti where Tv <: Signed
     @inbounds for n in 1:length(d.vals)
         d.vals[n] *= shift
     end
+end
+
+function h5totxt(dataset::String; folder="./data/DFSZ_models/test/")
+    fid = h5open(folder*dataset*".h5")
+    io = open(folder*dataset*".txt", "w")
+    write(io, "# Explanation of the columns:\n")
+    write(io, "# - model string consists of number of Higgs particles and indicators which higgs are meant to be equal (i.e. u1_u1_u1 means that the Higgs particle H_u1 couples to all of the up-type quarks and therefore χHu1, χHu2 and χHu3 obviously also have to be equal, because they are actually the charge of the same particle)\n")
+    write(io, "# - model multiplicity indicates 'how often' a model is realized. Completely analogous models like u1_u2_u1 and u1_u1_u3 (i.e. two up-type quarks couple to the same Higgs, one to another) are only calculated once. Since there are three options for this specific case, but e.g. for all up-type quarks coupling to the same Higgs there's only one options, this difference in probability between the two models is accounted for by our parameter 'model multiplicity'.\n")
+    write(io, "# - terms multiplicity indicates differences in the probability of the specific terms1-9 arising due to a specific potential. This can be ignored if potentials leading to the same solutions for Higgs charges are deemed equivalent. The difference in probability comes from multiple (quadrilinear) potential terms possibly leading to the same equation (e.g. (Hu1 Hu2') (Hu2 Hd1) leads to the same equation as (Hu1 Hl1) (Hl1' Hd1).\n")
+    write(io, "# - Anomaly Ratio is E/N\n")
+    write(io, "# - electromagnetic anomaly E\n")
+    write(io, "# - color anomaly N\n")
+    write(io, "# - χHi: Charge of the Higgs particle coupling to the quark i. If i=s, Charge of the Higgs singlet, always set =1 (wlg for calculating the Anomaly Ratio).\n")
+    write(io, "# - eqi: Equation number i. At least nH equations are needed to fix all nH Higgs charges. The nomenclature e.g. u1 is here simplified for χHu1. Together all equations give the matrix that is calculated to obtain solutions for the charges.\n")
+    write(io, "# \n")
+    write(io, "# model           model multiplicity  terms multiplicity  Anomaly Ratio   E    N     χHu1     χHu2     χHu3     χHd1     χHd2     χHd3     χHl1     χHl2     χHl3      χHs               eq1               eq2               eq3               eq4               eq5               eq6               eq7               eq8               eq9\n")
+    for (i, a) in enumerate(fid)
+        k = read(a)
+        if i != 1
+            for tuple in k#collect(values(k))
+                dat = tuple[2]
+                model = keys(fid)[i]
+                mmult = rpad(dat["model_multiplicity"],3)
+                for j in 1:length(dat["EoN"])
+                    write(io, model*"   "*mmult*"      "*rpad(dat["multis"][j],3)*"                 "*lpad(round(dat["EoN"][j], digits=3),8)*" "*lpad(Int(round(dat["E"][j])),5)*lpad(Int(round(dat["N"][j])),5)*(*(lpad.(round.(dat["Chis"][j,:],digits=3),9)...))*(*(lpad.(filter.(x -> !isspace(x), dat["terms"][j,:]),18)...))*"\n")
+                end
+            end
+            println(keys(fid)[i])
+            #println(collect(values(k))[1]["model_multiplicity"])
+        end
+    end
+    close(io)
+    close(fid)
 end
