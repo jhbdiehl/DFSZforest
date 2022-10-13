@@ -10,8 +10,15 @@ using FileIO, JLD2, HDF5
 using LaTeXStrings, Printf
 
 
-include("./drawer.jl")
-include("./helpers.jl")
+path = "./"
+include(path*"drawer.jl")
+include(path*"ksvz.jl")
+include(path*"helpers.jl")
+include(path*"constructors.jl")
+include(path*"LSEsolvers.jl")
+include(path*"runners.jl")
+include(path*"savers.jl")
+include(path*"analysers.jl")
 
 @variables u1::Int u2::Int u3::Int d1::Int d2::Int d3::Int l1::Int l2::Int l3::Int 
 
@@ -176,7 +183,7 @@ end
 models, multis = model_list(nD=[7])
 for x in parse.(Int64, ARGS)
     @info "Computing model $x of $ARGS ."
-    dataset = "test"
+    dataset = "220824-seriousruns"
     filename = "7EoNs_nomulti_NDW1_1"
     println(filename)
     runDFSZ(dataset, [models[x]]; model_multiplicity=[multis[x]], log_calculate_all_models_if_below=20, sample_models_factor=0.01, same_χH_one_theory=true, NDW1=true, filename=filename)
