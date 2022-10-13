@@ -1,5 +1,4 @@
-export construct_draw
-
+# This code was adapted from https://discourse.julialang.org/t/is-there-a-more-efficient-way-to-define-an-iterator-through-ordered-tuples/20819
 
 function next_tup(i, tup::NTuple{N,Int}) where N
     N == 1 && return (tup[1]+1,)
@@ -99,4 +98,14 @@ function myidxtup!(idxarr::Vector{<:Real}, bnc, idx::Int, ::Val{k}) where k
     idxarr[2] = 0
     idxarr[1] = -1
     SVector(ntuple(i -> idxarr[i] +2, Val(k+2)))
+end
+
+function make_idx_bnc(N)
+    for (i,t) in enumerate(TupIter{N}())
+        i > 10_000 && break
+        @assert i == tupidx(t)
+    end
+    bnc = binom_cache(N, 1000);
+    idxarr = similar([1],N+2);
+    return idxarr, bnc
 end
