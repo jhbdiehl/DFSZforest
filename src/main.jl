@@ -15,6 +15,9 @@ include("./helpers.jl")
 
 @variables u1::Int u2::Int u3::Int d1::Int d2::Int d3::Int l1::Int l2::Int l3::Int 
 
+a,m = get_quads([u1,u1,u1,d1,d1,d1,l1,l1,l1])
+m
+aa = get_bilins([u1,u1,u1,d1,d1,d1,l1,l1,l1])
 
 
 dataset = "test"
@@ -39,7 +42,10 @@ ve1 = collect(values(e1))
 ve1 = ve1[isnan.(ke1) .== 0]
 ke1 = ke1[isnan.(ke1) .== 0]
 
+plot()
+plot_EoN(e1)
 
+check_symmetry(e1)
 
 
 EoNs = []

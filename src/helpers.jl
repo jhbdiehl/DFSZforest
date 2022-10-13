@@ -874,29 +874,9 @@ function runDFSZ(dataset, model_vec; model_multiplicity=ones(length(model_vec)),
             crskgood0 = replace.(crsk, -0.0 => 0.0)
             crs = countmap(crskgood0, collect(values(crs)))
         end
-        #crs = collect(keys(crsi2))
-
-
-        #crs = convert(Vector{Vector{Float64}}, crs)
-        #@time alltmps = Vector{Vector{Float64}}()
-        #@time for cr in crs
-        #    tmp = similar(cr)
-        #    tmp[findall(!iszero,cr)] = cr[findall(!iszero,cr)]
-        #    tmp[findall(iszero,cr)] = cr[findall(iszero,cr)].^2
-        #    alltmps = vcat(alltmps, [tmp])
-        #end
-        #crs = permutedims(hcat(crs...))
-        #crs[findall(iszero,crs)] = crs[findall(iszero,crs)].^2 # -0.0 and 0.0 is the same thing!
-        #crs = collect(eachrow(crs))
-        #crs = countmap(crs, collect(values(crsi2)))
-
-        #crs = mergewith(+,rslist...)
-
-        #@time Threads.@threads for i in 1:1 # This loop is necessary, otherwise usage of myN generated function from above leads to world age error when multithreading
-        #EoNf = _EoNft(crs, myN, myEoN)
+        
         crsN = Base.invokelatest.(myN, collect(keys(crs)))
         crsEoN = Base.invokelatest.(myEoN, collect(keys(crs)))
-        #EoNf = ifelse.(-0.000000001 .< crsN .< 0.000000001, NaN, crsEoN)
         if NDW1
             truN = similar(crsN)
             truN[isnan.(crsN)] .= NaN
@@ -911,14 +891,11 @@ function runDFSZ(dataset, model_vec; model_multiplicity=ones(length(model_vec)),
         else
             cEoN = countmap(round.(EoNf, digits=6), collect(values(crs)) .* model_multiplicity[k])
         end
-        
-        #clean_countmap!(cEoN)
-        #EoN_countmaps[k] = crs#cEoN
-        save_EoN(model, cEoN; folder=dataset, filename=filename)
-        #end
 
+        EoN_countmaps[k] = cEoN
+        save_EoN(model, cEoN; folder=dataset, filename=filename)
     end
-    #return EoN_countmaps
+    return EoN_countmaps
 end
 
 
@@ -989,4 +966,26 @@ function runDFSZ_saveall(dataset, model_vec; model_multiplicity=ones(length(mode
             save_full(model, proc_rs, EoN_rs, rs_ws, stringterms, 1; folder=dataset, bilin=bilin, ms=mult, model_multiplicity=model_multiplicity[k], full=(tot_min <= 10^log_calculate_all_models_if_below))
         end
     end
+end
+
+
+function plot_EoN(EoN_countmap)
+    h1 = _make_hist(EoN_countmap)
+    plot()
+    plot_hist!(h1, yaxis=(:identity, [0.000000001,:auto]))
+end
+
+function read_EoN(dataset, models; specifier="EoNs")
+    totEoN = countmap([])
+    for model in models
+        tpath = "./data/DFSZ_models/"*dataset
+        name = model2string(model)
+        nD = length(unique(model))
+
+        e1 = FileIO.load(tpath*"/"*specifier*".jld2", string(nD)*"/"*name)
+        totEoN= mergewith(+,totEoN,e1)
+    end
+    #v = collect(values(totEoN)) ./ sum(values(totEoN))
+    #totEoN = countmap(collect(keys(totEoN)), v)
+    return totEoN
 end
