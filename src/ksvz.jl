@@ -21,19 +21,42 @@ def plakkot(str):
 
 """
 
-function ksvz(str; edges=-10:0.01:50)
+function ksvz(str; edges=-10:0.01:50, Cagdist=false)
     if str ∈ ["additive", "all", "same_reps"]
         e_n, e_n_counts, n_dw = py"plakkot"("histogram_"*str*"_LP_allowed_models")
+        println(sum(e_n_counts))
 
         e_n = convert(Vector{Float64}, e_n)
         n_dw = convert(Vector{Float64}, n_dw)
+        
+        #=
+        if Cagdist
+            e_n = cm2vector(e_n, e_n_counts)
+            e_n = e_n .+ rand(Normal(0.0,0.04), length(e_n))
+            enc = countmap(e_n)
+            e_n = collect(keys(enc))
+            e_n_counts = collect(values(enc))
+        end
+        =#
+        
         KSVZ_ARs = fit(Histogram, e_n, FrequencyWeights(e_n_counts), edges)
+        
 
-        KSVZgag = gag_histogram(KSVZ_ARs, mode=:probability, edges=-18:0.001:-12)
+        KSVZgag = gag_histogram(KSVZ_ARs, mode=:probability, edges=-17:0.000001:-12, Cagdist=Cagdist)
         KSVZgag = normalize(KSVZgag; mode=:probability)
 
         return KSVZ_ARs, KSVZgag, n_dw
     else
-        error("Can only read three different histograms from Plakkot: additive, all and same_reps")
+        error("Can only read from Plakkot: additive_LP_allowed_models, all_LP_allowed_models,  same_reps_LP_allowed_models")
     end
+end
+
+function cm2vector(a,b)
+    aa = []
+    for (i,e) in enumerate(b)
+        for j in 1:e
+            append!(aa, a[i])
+        end
+    end
+    return aa
 end

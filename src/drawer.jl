@@ -75,14 +75,14 @@ function check_tups(bnc, tp::TupIter{N}, n) where N
     end
 end;
 
-function construct_draw(nH)
-    for (i,t) in enumerate(TupIter{nH-2}())
+function construct_draw(nD)
+    for (i,t) in enumerate(TupIter{nD-2}())
         i > 10_000 && break
         @assert i == tupidx(t)
     end
-    bnc = binom_cache(nH-2, 1000);
-    idxarr = similar([1],nH-2);
-    ac = i->myidxtup!(idxarr, bnc, i, Val(nH-2));
+    bnc = binom_cache(nD-2, 1000);
+    idxarr = similar([1],nD-2);
+    ac = i->myidxtup!(idxarr, bnc, i, Val(nD-2));
 end
 
 function myidxtup!(idxarr::Vector{<:Real}, bnc, idx::Int, ::Val{k}) where k

@@ -1,0 +1,2 @@
+julia --project=. --threads=48 src/tmp2.jl 1 2 3 4
+
