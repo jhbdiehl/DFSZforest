@@ -4,7 +4,20 @@ Compute anomaly ratios for different DFSY-type models. This code has been used f
 
 ## Installation
 
-  To do when code is finished
+Open a terminal and go to your favourite directory. Then run
+
+```shell
+git clone https://github.com/jhbdiehl/DFSZforest.git
+cd DFSZforest
+```
+
+The project is written mainly in Julia, so you will need to have this programming language installed. Go [here](https://julialang.org/) for more information. Once you have it installed and are able to call it from the terminal, the only thing you have to do to start the example notebook is run the following command on the terminal.
+
+```shell
+julia runnotebook.jl
+```
+
+This may take a while when running it for the first time, since it installs all dependencies as well as a contained jupyter installation for running notebooks.
 
 ## Usage
 
