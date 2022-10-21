@@ -90,7 +90,7 @@ end
 function gag_histogram(tt; ma=40e-6, edges=-16:0.001:-12, mode=:pdf, Cagdist=false)
 
     if Cagdist
-        ttvec = sample(tt.edges[1][1:end-1] .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]), FrequencyWeights(tt.weights), 10000000)
+        ttvec = sample(tt.edges[1][1:end-1] .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]), FrequencyWeights(tt.weights), 100000000)
         ttvec .+= rand(Normal(0.0,0.04), length(ttvec))
         ttcm = countmap(ttvec)
         tt, tmp = _make_hist(ttcm; bins=-50:0.0001:50)

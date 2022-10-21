@@ -1,13 +1,9 @@
-using LinearAlgebra, StaticArrays
-using Random, Statistics, StatsBase
-using BenchmarkTools
-using Base.Threads
-using Plots
-using Random: default_rng
+using StaticArrays
 using Symbolics
 using Combinatorics
-using FileIO, JLD2, HDF5
-using LaTeXStrings, Printf
+using LinearAlgebra
+using HDF5, FileIO, JLD2
+using Plots
 
 
 path = "./"
@@ -184,7 +180,26 @@ models, multis = model_list(nD=[7])
 for x in parse.(Int64, ARGS)
     @info "Computing model $x of $ARGS ."
     dataset = "220824-seriousruns"
-    filename = "7EoNs_nomulti_NDW1_1"
+    filename = "7EoNs_nomulti_NDW1_6"
     println(filename)
     runDFSZ(dataset, [models[x]]; model_multiplicity=[multis[x]], log_calculate_all_models_if_below=20, sample_models_factor=0.01, same_χH_one_theory=true, NDW1=true, filename=filename)
 end
+
+dataset = "220824-seriousruns"
+models, multis = model_list(nD=[7])
+e1 = read_EoN(dataset, [models[1]], specifier="7EoNs_nomulti_NDW1_1")
+e2 = read_EoN(dataset, [models[2]], specifier="7EoNs_nomulti_NDW1_2")
+e3 = read_EoN(dataset, [models[3]], specifier="7EoNs_nomulti_NDW1_3")
+e4 = read_EoN(dataset, [models[4]], specifier="7EoNs_nomulti_NDW1_4")
+e5 = read_EoN(dataset, [models[5]], specifier="7EoNs_nomulti_NDW1_5")
+e6 = read_EoN(dataset, [models[6]], specifier="7EoNs_nomulti_NDW1_6")
+
+ee = merge(+, e1,e2,e3,e4,e5,e6)
+
+elist = [e1,e2,e3,e4,e5,e6]
+
+for (i, model) in enumerate(models)
+    save_EoN(model, elist[i]; folder=dataset, new_file=false, filename="7EoNs_nomulti_NDW1")
+end
+
+ee = read_EoN(dataset, models, specifier="7EoNs_nomulti_NDW1")
