@@ -1,6 +1,6 @@
 # DFSZforest
 
-Compute anomaly ratios for different DFSY-type models. This code has been used for the paper [*DFSZ axions and where to find them*](https://arxiv.com) by [Emmanouil Koutsangelas]() and [Johannes Diehl](https://scholar.google.com/citations?hl=en&user=BrHSTFwAAAAJ). The data files included can also be found separately on [Zenodo](https://zenodo.org).
+Compute anomaly ratios for different DFSZ-type models. This code has been used for the paper [*DFSZ axions and where to find them*](https://arxiv.com) by [Johannes Diehl](https://scholar.google.com/citations?hl=en&user=BrHSTFwAAAAJ) by [Emmanouil Koutsangelas](). The data files included can also be found separately on [Zenodo](https://zenodo.org).
 
 ## Installation
 
@@ -11,7 +11,7 @@ git clone https://github.com/jhbdiehl/DFSZforest.git
 cd DFSZforest
 ```
 
-The project is written mainly in Julia, so you will need to have this programming language installed. Go [here](https://julialang.org/) for more information. Once you have it installed and are able to call it from the terminal, the only thing you have to do to start the example notebook is run the following command on the terminal.
+The project is written mainly in Julia, so you will need to have this programming language installed. Go [here](https://julialang.org/) for more information. To be able to run it from the terminal maybe have a look [here](https://julialang.org/downloads/platform/). Once you have it installed and are able to call it from the terminal, the only thing you have to do to start the example notebook is run the following command on the terminal. 
 
 ```shell
 julia runnotebook.jl
