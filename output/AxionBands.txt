@@ -1,0 +1,28 @@
+# Detailed explanation of different scenarios:
+# diLuzio : arXiv [1705.05370], classic axion band between E/N = 44/3 and E/N = 5/3.
+#           Contains all KSVZ models with one additional quark and all DFSZ models with one additional Higgs doublet.
+#           Not a band in a statistical sense, rather a region of the parameterspace where several DISCREET models lie. Use when interested in minimal extensions.
+# KSVZ    : arXiv [2107.12378], bands and one-sided limits derived from Plakkot&Hoof.
+#           Contains complete set of preferred KSVZ models with up to nine additional quark, assuming equal probability for all models.
+#           Use when specifically interested in KSVZ models beyond minimal extensions.
+# DFSZ    : this work, bands and one-sided limits.
+#           Contains DFSZ models with up to nine higgs doublets, extrapolating beyond DFSZ₇, assuming equal probability for all numbers of Higgs doublets.
+#           Contrary to KSVZ case no phenomenological selection criteria were applied.
+#           Use when specifically interested in DFSZ models beyond minimal extensions.
+# Combined: bands and one-sided limits for KSVZ and DFSZ case combined assuming equal probability for a DFSZ axion and for a KSVZ axion.
+#           Use if you have no preference for DFSZ or KSVZ and want to consider beyond minimal extensions.
+# N_DW=1  : bands and one-sided limits for KSVZ and DFSZ case combined assuming equal probability for a DFSZ axion and for a KSVZ axion, only considering models with domain wall number of one.
+#           DFSZ case only includes DFSZ₂ to DFSZ₆. No extrapolation beyond.
+#           Use if you have no preference for DFSZ or KSVZ, want to consider beyond minimal extensions, are interested in the post-inflationary scenario and believe that the domain wall problem is indeed a problem.
+#
+# All values given are |E/N - 1.92| corresponding to the presented limits.
+# All limits given are one-sided. For a central 68% axion band use 0.16 and 0.84 limits, or a central 95% axion band use 0.975 and 0.025.
+#
+#            minimal value      maximal value
+diLuzio         0.253          11.747
+#
+# Limit:      0.68     0.95     0.16     0.84    0.025    0.975
+KSVZ         0.812     0.12    5.219     0.39   17.301    0.061
+DFSZ         0.803    0.162     4.42    0.478   18.735    0.079
+Combined     0.807    0.137    4.755    0.426   18.315    0.069
+N_DW=1       7.216    1.206   23.319     3.26   35.329    0.751
