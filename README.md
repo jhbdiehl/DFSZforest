@@ -21,7 +21,7 @@ This may take a while when running it for the first time, since it installs all 
 
 ## Usage
 
-First let's clear up some jargon: There are three types of fermions with three generations each: up-, down and lepton type. Up-type fermions would for example be the up, charm and top quarks. Instead of abbreviating different generations differently, we give a generational index. Here and throughout the code terms like `ui` are used to denote the charge of the Higgs doublet coupling to the up-type quarks. E.g. u3 is the charge of $H_{u_3}$, the Higgs which couples to the top quark and l2 the charge of $H_{l_2}$, the Higgs coupling to the muon.
+First let's clear up some jargon: There are three types of fermions with three generations each: up-, down and lepton type. Up-type fermions would for example be the up, charm and top quarks. Instead of abbreviating different generations differently, we give a generational index. Here and throughout the code terms like `ui` are used to denote the charge of the Higgs doublet coupling to the up-type quarks. E.g. $u3$ is the charge of $H_{u_3}$, the Higgs which couples to the top quark and $l2$ the charge of $H_{l_2}$, the Higgs coupling to the muon. (Note: In the paper we use indices $e1$, $e2$ and $e3$ for Higgs coupling to the leptons. Since this notation would lead to clashes with the implementation of scientific notation (`1e1`), we use $l$ instead.)
 
 To write specific models, we use a list of symbols, e.g. `[u1,u1,u3,d1,d1,d1,l1,l1,l1]` is a model with four Higgs doublets ($n_D=4$), where all lepton-type fermions couple to one Higgs, all down-type fermions couple to a second Higgs and the top quark couples to a different Higgs than up and charm quark.
 
