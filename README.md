@@ -1,6 +1,6 @@
 # DFSZforest
 
-Compute anomaly ratios for different DFSZ-type models. This code has been used for the paper [*DFSZ axions and where to find them*](https://arxiv.com) by [Johannes Diehl](https://scholar.google.com/citations?hl=en&user=BrHSTFwAAAAJ) by [Emmanouil Koutsangelas](). The data files included can also be found separately on [Zenodo](https://zenodo.org).
+Compute anomaly ratios for different DFSZ-type models. This code has been used for the paper [*DFSZ axions and where to find them*](https://arxiv.com) by [Johannes Diehl](https://scholar.google.com/citations?user=BrHSTFwAAAAJ) by [Emmanouil Koutsangelas](https://scholar.google.com/citations?user=9_w7hxYAAAAJ). The data files included can also be found separately on [Zenodo](https://zenodo.org/deposit/7620203).
 
 ## Installation
 
