@@ -91,9 +91,9 @@ function gag_histogram(tt; ma=40e-6, edges=-16:0.001:-12, mode=:pdf, Cagdist=fal
 
     if Cagdist
         ttvec = sample(tt.edges[1][1:end-1] .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]), FrequencyWeights(tt.weights), 100000000)
-        ttvec .+= rand(Normal(0.0,0.04), length(ttvec))
+        ttvec .+= rand(Normal(0.0,0.04), length(ttvec)) # The -1.92 part comes in when we throw this into gaγγ later. Therefore we only treat the uncertainty here with μ=0.0.
         ttcm = countmap(ttvec)
-        tt, tmp = _make_hist(ttcm; bins=-50:0.0001:50)
+        tt, tmp = _make_hist(ttcm; bins=-125:0.0001:125) #loggaγγ(125, fa(40e-6)) ∼ -12 therefore need to go to 125
     end
 
     gags = gaγγ.(collect(tt.edges...) .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]), fa(ma))[1:end-1]
@@ -105,6 +105,23 @@ function gag_histogram(tt; ma=40e-6, edges=-16:0.001:-12, mode=:pdf, Cagdist=fal
     return gagh
 end
 
+function Cag_histogram(tt; edges=-3:0.001:2.5, mode=:pdf, Cagdist=false)
+
+    if Cagdist
+        ttvec = sample(tt.edges[1][1:end-1] .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]), FrequencyWeights(tt.weights), 100000000)
+        ttvec .+= rand(Normal(0.0,0.04), length(ttvec)) 
+        ttcm = countmap(ttvec)
+        tt, tmp = _make_hist(ttcm; bins=-300:0.0001:300)
+    end
+
+    Cags = log10.(abs.(collect(tt.edges...) .+ 1/2 * (tt.edges[1][2] - tt.edges[1][1]) .- 1.92)[1:end-1])
+    Cagh = fit(Histogram, Cags, FrequencyWeights(tt.weights), edges)
+    if mode ∈ [:pdf, :probability]
+        Cagh = normalize(Cagh; mode=mode)
+    end
+
+    return Cagh
+end
 
 function cdf(Hist) # I want mw[i] =  sum(gagh.weights[i:end])/ s aka cumsum from the back
     return cumsum(Hist.weights[end:-1:1])[end:-1:1] / sum(Hist.weights)
