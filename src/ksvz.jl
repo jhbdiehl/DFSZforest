@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from fractions import Fraction
 
-# Select histogram file to read
+# Select histogram file to read FILE PATH HAS TO BE CHANGED!!!
 def plakkot(str):
     e_num, e_denom, n_num, n_denom, counts = np.genfromtxt('./data/KSVZ-hists/'+str+'.txt',
                                                         delimiter='\t', unpack=True, dtype='i')
