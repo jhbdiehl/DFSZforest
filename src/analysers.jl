@@ -72,7 +72,11 @@ function forecast(crs1, crs2)
 end
 
 function normalize_cm(cm)
-    Dict(collect(keys(cm)) .=> collect(values(cm)) ./ sum(collect(values(cm))))
+    if cm != Dict()
+        Dict(collect(keys(cm)) .=> collect(values(cm)) ./ sum(collect(values(cm))))
+    else
+        Dict()
+    end
 end
 
 
