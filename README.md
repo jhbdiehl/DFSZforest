@@ -17,7 +17,7 @@ The project is written mainly in Julia, so you will need to have this programmin
 julia runnotebook.jl
 ```
 
-This may take a while when running it for the first time, since it installs all dependencies as well as a contained jupyter installation for running notebooks.
+This may take a while when running it for the first time, since it installs all dependencies as well as a contained jupyter installation for running notebooks. If the notebook does not start automatically, a link should be visible in the terminal that can be pasted into the browser to open it. The installation presented here may differ for Windows systems.
 
 ## Usage
 
